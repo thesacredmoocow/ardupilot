@@ -148,6 +148,7 @@ static const struct {
     { "y6",                 MultiCopter::create },
     { "deca",               MultiCopter::create },
     { "deca-cwx",           MultiCopter::create },
+    { "tilthvec",           MultiCopter::create },
     { "heli",               Helicopter::create },
     { "heli-dual",          Helicopter::create },
     { "heli-compound",      Helicopter::create },

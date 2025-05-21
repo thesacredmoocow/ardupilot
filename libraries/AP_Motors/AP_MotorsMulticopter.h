@@ -179,6 +179,10 @@ protected:
     // scaling for booster motor throttle
     AP_Float            _boost_scale;
 
+    // actuation limits for tiltrotor
+    AP_Float            _tiltrotor_min_angle;
+    AP_Float            _tiltrotor_max_angle;
+
     // motor output variables
     bool                motor_enabled[AP_MOTORS_MAX_NUM_MOTORS];    // true if motor is enabled
 
