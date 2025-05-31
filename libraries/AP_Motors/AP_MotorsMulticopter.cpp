@@ -231,6 +231,23 @@ const AP_Param::GroupInfo AP_MotorsMulticopter::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("SPOOL_TIM_DN", 44, AP_MotorsMulticopter, _spool_down_time, 0),
 
+
+    // @Param: TILT_MIN
+    // @DisplayName: minimum angle of the thrust vectoring system
+    // @Description: minimum angle of the thrust vectoring system
+    // @Units: deg
+    // @Range: -90 0
+    // @User: Standard
+    AP_GROUPINFO("TILT_MIN", 45, AP_MotorsMulticopter, _tiltrotor_min_angle, -10.0),
+
+    // @Param: TILT_MAX
+    // @DisplayName: maximum angle of the thrust vectoring system
+    // @Description: maximum angle of the thrust vectoring system
+    // @Units: deg
+    // @Range: 0 270
+    // @User: Standard
+    AP_GROUPINFO("TILT_MAX", 46, AP_MotorsMulticopter, _tiltrotor_max_angle, 90.0),
+
     AP_GROUPEND
 };
 

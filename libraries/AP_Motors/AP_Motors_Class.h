@@ -75,6 +75,7 @@ public:
         MOTOR_FRAME_SCRIPTING_MATRIX = 15,
         MOTOR_FRAME_6DOF_SCRIPTING = 16,
         MOTOR_FRAME_DYNAMIC_SCRIPTING_MATRIX = 17,
+        MOTOR_FRAME_TILTROTOR = 18,
     };
 
     // return string corresponding to frame_class
@@ -98,6 +99,7 @@ public:
         MOTOR_FRAME_TYPE_NYT_X = 17, // X frame, no differential torque for yaw
         MOTOR_FRAME_TYPE_BF_X_REV = 18, // X frame, betaflight ordering, reversed motors
         MOTOR_FRAME_TYPE_Y4 = 19, //Y4 Quadrotor frame
+        MOTOR_FRAME_TYPE_TILTROTOR_X = 20,
     };
 
 
@@ -146,6 +148,8 @@ public:
 
     // for 6DoF vehicles, sets the roll and pitch offset, this rotates the thrust vector in body frame
     virtual void        set_roll_pitch(float roll_deg, float pitch_deg) {};
+
+    virtual void        set_pitch_angle(float pitch_deg) {};
 
     // accessors for roll, pitch, yaw and throttle inputs to motors
     float               get_roll() const { return _roll_in; }

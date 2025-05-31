@@ -155,10 +155,12 @@ protected:
     const char*         _frame_class_string = ""; // string representation of frame class
     const char*         _frame_type_string = "";  //  string representation of frame type
 
-private:
 
     // helper to return value scaled between boost and normal based on the value of _thrust_boost_ratio
     float boost_ratio(float boost_value, float normal_value) const;
+
+private:
+
 
     // setup motors matrix
     bool setup_quad_matrix(motor_frame_type frame_type);

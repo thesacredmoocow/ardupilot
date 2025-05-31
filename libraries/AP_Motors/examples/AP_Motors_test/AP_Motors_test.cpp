@@ -347,7 +347,7 @@ void print_all_motor_matrix()
     char frame_and_type_string[30];
 
     for (uint8_t frame_class=0; frame_class <= AP_Motors::MOTOR_FRAME_DECA; frame_class++) {
-        for (uint8_t frame_type=0; frame_type < AP_Motors::MOTOR_FRAME_TYPE_Y4; frame_type++) {
+        for (uint8_t frame_type=0; frame_type < AP_Motors::MOTOR_FRAME_TYPE_TILTROTOR_X; frame_type++) {
             if (frame_type == AP_Motors::MOTOR_FRAME_TYPE_VTAIL ||
                 frame_type == AP_Motors::MOTOR_FRAME_TYPE_ATAIL) {
                 // Skip the none planar motors types
