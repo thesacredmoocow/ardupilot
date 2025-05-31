@@ -443,7 +443,7 @@ void Copter::allocate_motors(void)
 #endif // AP_SCRIPTING_ENABLED
     } else if ((AP_Motors::motor_frame_class)g2.frame_class.get() == AP_Motors::MOTOR_FRAME_TILTROTOR) {
         attitude_control = new AC_AttitudeControl_Tiltrotor(*ahrs_view, aparm, *motors);
-        ac_var_info = AC_AttitudeControl_Tiltrotor::var_info;
+        attitude_control_var_info = AC_AttitudeControl_Tiltrotor::var_info;
     } else {
         attitude_control = NEW_NOTHROW AC_AttitudeControl_Multi(*ahrs_view, aparm, *motors);
         attitude_control_var_info = AC_AttitudeControl_Multi::var_info;

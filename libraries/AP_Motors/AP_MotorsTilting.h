@@ -1,5 +1,4 @@
 #pragma once
-#if AP_SCRIPTING_ENABLED
 
 #include "AP_MotorsMatrix.h"
 
@@ -30,8 +29,6 @@ public:
 
     void init(motor_frame_class frame_class, motor_frame_type frame_type) override;
 
-    // Init to be called from scripting
-    bool init(uint8_t expected_num_motors) override {return true;};
 
     // add a interpolation point table
     void load_factors(const factor_table &table);
@@ -40,7 +37,7 @@ public:
     void output_to_motors() override;
 
     // set the target pitch angle positive is nose up
-    void set_pitch_angle(float angle);
+    void set_pitch_angle(float angle) override;
 
 protected:
 
@@ -57,5 +54,3 @@ protected:
 private:
     static AP_MotorsTilting *_singleton;
 };
-
-#endif // AP_SCRIPTING_ENABLED

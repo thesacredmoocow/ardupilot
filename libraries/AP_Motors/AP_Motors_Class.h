@@ -149,6 +149,8 @@ public:
     // for 6DoF vehicles, sets the roll and pitch offset, this rotates the thrust vector in body frame
     virtual void        set_roll_pitch(float roll_deg, float pitch_deg) {};
 
+    virtual void        set_pitch_angle(float pitch_deg) {};
+
     // accessors for roll, pitch, yaw and throttle inputs to motors
     float               get_roll() const { return _roll_in; }
     float               get_roll_ff() const { return _roll_in_ff; }

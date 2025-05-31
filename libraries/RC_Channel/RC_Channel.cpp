@@ -60,6 +60,7 @@ extern const AP_HAL::HAL& hal;
 #include <AP_Torqeedo/AP_Torqeedo.h>
 #include <AP_Vehicle/AP_Vehicle_Type.h>
 #include <AP_Parachute/AP_Parachute_config.h>
+#include <AC_AttitudeControl/AC_AttitudeControl_Tiltrotor.h>
 #define SWITCH_DEBOUNCE_TIME_MS  200
 
 const AP_Param::GroupInfo RC_Channel::var_info[] = {
@@ -771,6 +772,7 @@ void RC_Channel::init_aux_function(const AUX_FUNC ch_option, const AuxSwitchPos 
 #endif
 #if AP_AHRS_ENABLED
     case AUX_FUNC::AHRS_TYPE:
+    case AUX_FUNC::TILTROTOR_EN:
         run_aux_function(ch_option, ch_flag, AuxFuncTriggerSource::INIT);
         break;
 #endif
@@ -893,6 +895,7 @@ const RC_Channel::LookupTable RC_Channel::lookuptable[] = {
 #if HAL_MOUNT_ENABLED
     { AUX_FUNC::MOUNT_LRF_ENABLE, "Mount LRF Enable"},
 #endif
+    { AUX_FUNC::TILTROTOR_EN, "Enable Tiltrotor 5DOF control"},
 };
 
 /* lookup the announcement for switch change */
@@ -1832,6 +1835,16 @@ bool RC_Channel::do_aux_function(const AUX_FUNC ch_option, const AuxSwitchPos ch
         break;
     }
 #endif  // AP_AHRS_ENABLED
+
+    case AUX_FUNC::TILTROTOR_EN: {
+        AC_AttitudeControl_Tiltrotor *attitude_controller = AC_AttitudeControl_Tiltrotor::get_singleton();
+        if(attitude_controller != nullptr)
+        {
+            attitude_controller->set_5dof_enable(ch_flag == AuxSwitchPos::HIGH);
+        }
+        break;
+    }
+        
 
 #if HAL_TORQEEDO_ENABLED
     // clear torqeedo error
