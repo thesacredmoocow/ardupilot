@@ -99,8 +99,6 @@ void AP_MotorsTilting::load_factors(const factor_table &new_table)
 // Need to take the semaphore to enasure the motor factors are not changed during the mixer calculation
 void AP_MotorsTilting::output_to_motors()
 {
-    // set_thrust_angle(15.0);
-    // call the base class ouput 
     const float total_angle = _tiltrotor_max_angle - _tiltrotor_min_angle;
     const float output = (pitch_offset_angle - _tiltrotor_min_angle) / total_angle;
     const uint16_t output_pwm = (uint16_t)(output * 1000.0) + 1000;

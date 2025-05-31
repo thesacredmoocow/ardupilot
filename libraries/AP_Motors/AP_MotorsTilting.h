@@ -40,7 +40,7 @@ public:
     void output_to_motors() override;
 
     // set the target pitch angle positive is nose up
-    void set_pitch_angle(float angle);
+    void set_pitch_angle(float angle) override;
 
 protected:
 
