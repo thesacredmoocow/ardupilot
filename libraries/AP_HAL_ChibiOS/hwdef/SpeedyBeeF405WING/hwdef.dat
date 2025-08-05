@@ -175,9 +175,33 @@ undef AP_CAMERA_MOUNT_ENABLED
 undef HAL_MOUNT_ENABLED
 undef HAL_MOUNT_SERVO_ENABLED
 
-define AP_CAMERA_MOUNT_ENABLED 1
+define AP_CAMERA_MOUNT_ENABLED 0
 define HAL_MOUNT_ENABLED 1
 define AP_MOUNT_BACKEND_DEFAULT_ENABLED 0
-define HAL_MOUNT_SERVO_ENABLED 1
+define HAL_MOUNT_SERVO_ENABLED 0
 
 define DEFAULT_NTF_LED_TYPES 257
+
+# Crossfire telemetry must be explicitly enabled on minimized boards:
+define HAL_CRSF_TELEM_ENABLED 0
+
+# Soaring is off by defauult on of smaller boards.
+define HAL_SOARING_ENABLED 0
+
+# RunCam control isn't available on smaller boards
+define HAL_RUNCAM_ENABLED 0
+
+# minimized boards don't get configuration via SmartAudio by default:
+define AP_SMARTAUDIO_ENABLED 0
+
+# no Spektrum telemetry:
+define HAL_SPEKTRUM_TELEM_ENABLED 0
+
+# no MSP:
+define HAL_MSP_ENABLED 0
+
+# Copter-specific defines; these defines are only used in the Copter
+#  directory, but are seen across the entire codebase:
+define MODE_TURTLE_ENABLED 0
+
+define AP_CUSTOMROTATIONS_ENABLED 0

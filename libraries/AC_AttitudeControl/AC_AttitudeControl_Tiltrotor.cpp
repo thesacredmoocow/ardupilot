@@ -2,7 +2,6 @@
 #include <AP_HAL/AP_HAL.h>
 #include <AP_Math/AP_Math.h>
 #include <AC_PID/AC_PID.h>
-#include <AP_CustomRotations/AP_CustomRotations.h>
 
 #include <stdio.h>
 
@@ -276,16 +275,24 @@ void AC_AttitudeControl_Tiltrotor::rate_controller_run() {
 
         const RC_Channel *pitch_ch = rc().find_channel_for_option(RC_Channel::AUX_FUNC::MOUNT2_PITCH);
         const float pitch_in = (pitch_ch == nullptr) ? 0.0f : pitch_ch->norm_input();
-        pitch_offset_deg = 90.0f * pitch_in;
+        pitch_offset_deg = 20.0f * pitch_in;
 
         virtual_pitch_offset_deg = target_virtual_pitch;
-        _motors.set_pitch_angle(pitch_offset_deg + virtual_pitch_offset_deg);
-        AP::custom_rotations().set(ROTATION_CUSTOM_1, 0.0f, pitch_offset_deg + virtual_pitch_offset_deg, 0.0f);
+        _motors.set_pitch_angle(pitch_offset_deg - virtual_pitch_offset_deg);
+        Vector3f trim;
+        trim.x = 0;
+        trim.z = 0;
+        trim.y = ToRad(pitch_offset_deg - virtual_pitch_offset_deg);
+        AP::ahrs().set_trim(trim);
     }
     else
     {
         _motors.set_pitch_angle(0.0f);
-        AP::custom_rotations().set(ROTATION_CUSTOM_1, 0.0f, 0.0f, 0.0f);
+        Vector3f trim;
+        trim.x = 0;
+        trim.z = 0;
+        trim.y = 0;
+        AP::ahrs().set_trim(trim);
 
         // put these all back at zero so no jump transitioning into 5dof
         pitch_offset_deg = 0.0f;
@@ -305,15 +312,19 @@ void AC_AttitudeControl_Tiltrotor::rate_controller_run() {
 // Command an euler roll and pitch angle and an euler yaw rate with angular velocity feedforward and smoothing
 void AC_AttitudeControl_Tiltrotor::input_euler_angle_roll_pitch_euler_rate_yaw(float euler_roll_angle_cd, float euler_pitch_angle_cd, float euler_yaw_rate_cds) {
     set_virtual_pitch(euler_pitch_angle_cd / 100.0f);
+    float pitch_target = tiltrotor_5dof_enabled ? 0.0f : euler_pitch_angle_cd;
+    pitch_target = euler_pitch_angle_cd;
 
-    AC_AttitudeControl_Multi::input_euler_angle_roll_pitch_euler_rate_yaw(euler_roll_angle_cd, euler_pitch_angle_cd, euler_yaw_rate_cds);
+    AC_AttitudeControl_Multi::input_euler_angle_roll_pitch_euler_rate_yaw(euler_roll_angle_cd, pitch_target, euler_yaw_rate_cds);
 }
 
 // Command an euler roll, pitch and yaw angle with angular velocity feedforward and smoothing
 void AC_AttitudeControl_Tiltrotor::input_euler_angle_roll_pitch_yaw(float euler_roll_angle_cd, float euler_pitch_angle_cd, float euler_yaw_angle_cd, bool slew_yaw) {
     set_virtual_pitch(euler_pitch_angle_cd / 100.0f);
+    float pitch_target = tiltrotor_5dof_enabled ? 0.0f : euler_pitch_angle_cd;
+    pitch_target = euler_pitch_angle_cd;
 
-    AC_AttitudeControl_Multi::input_euler_angle_roll_pitch_yaw(euler_roll_angle_cd, euler_pitch_angle_cd, euler_yaw_angle_cd, slew_yaw);
+    AC_AttitudeControl_Multi::input_euler_angle_roll_pitch_yaw(euler_roll_angle_cd, pitch_target, euler_yaw_angle_cd, slew_yaw);
 }
 
 // Command a thrust vector and heading rate
@@ -324,8 +335,10 @@ void AC_AttitudeControl_Tiltrotor::input_thrust_vector_rate_heading(const Vector
     Vector3f angle_target = attitude_from_thrust_vector(thrust_vector, _ahrs.yaw).to_vector312();
 
     set_virtual_pitch(degrees(angle_target.y));
+    float pitch_target = tiltrotor_5dof_enabled ? 0.0f : (degrees(angle_target.y) * 100.0f);
+    pitch_target = (degrees(angle_target.y) * 100.0f);
 
-    input_euler_angle_roll_pitch_euler_rate_yaw(degrees(angle_target.x) * 100.0f, degrees(angle_target.y) * 100.0f, heading_rate_cds);
+    input_euler_angle_roll_pitch_euler_rate_yaw(degrees(angle_target.x) * 100.0f, pitch_target, heading_rate_cds);
 }
 
 // Command a thrust vector, heading and heading rate
@@ -335,9 +348,11 @@ void AC_AttitudeControl_Tiltrotor::input_thrust_vector_heading(const Vector3f& t
     Vector3f angle_target = attitude_from_thrust_vector(thrust_vector, _ahrs.yaw).to_vector312();
 
     set_virtual_pitch(degrees(angle_target.y));
+    float pitch_target = tiltrotor_5dof_enabled ? 0.0f : (degrees(angle_target.y) * 100.0f);
+    pitch_target = (degrees(angle_target.y) * 100.0f);
 
     // note that we are throwing away heading rate here
-    input_euler_angle_roll_pitch_yaw(degrees(angle_target.x) * 100.0f, degrees(angle_target.y) * 100.0f, heading_angle_cd, true);
+    input_euler_angle_roll_pitch_yaw(degrees(angle_target.x) * 100.0f, pitch_target, heading_angle_cd, true);
 }
 
 /*

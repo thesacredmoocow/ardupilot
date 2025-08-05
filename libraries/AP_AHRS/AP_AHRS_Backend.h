@@ -27,7 +27,7 @@
 #include <AP_Common/Location.h>
 #include <AP_NavEKF/AP_NavEKF_Source.h>
 
-#define AP_AHRS_TRIM_LIMIT 10.0f        // maximum trim angle in degrees
+#define AP_AHRS_TRIM_LIMIT 360.0f        // maximum trim angle in degrees
 #define AP_AHRS_RP_P_MIN   0.05f        // minimum value for AHRS_RP_P parameter
 #define AP_AHRS_YAW_P_MIN  0.05f        // minimum value for AHRS_YAW_P parameter
 

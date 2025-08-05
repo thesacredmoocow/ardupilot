@@ -6,6 +6,7 @@
 #include "AC_AttitudeControl.h"
 #include "AC_AttitudeControl_Multi.h"
 #include <AP_Motors/AP_MotorsMulticopter.h>
+#include <GCS_MAVLink/GCS.h>
 
 class AC_AttitudeControl_Tiltrotor : public AC_AttitudeControl_Multi {
 public:
@@ -77,6 +78,10 @@ public:
 
     void set_5dof_enable(bool enable)
     {
+        if (enable != tiltrotor_5dof_enabled)
+        {
+            gcs().send_text(MAV_SEVERITY_DEBUG, enable ? "5DoF Enabled" : "5DoF Disabled" );
+        }
         tiltrotor_5dof_enabled = enable;
     }
 

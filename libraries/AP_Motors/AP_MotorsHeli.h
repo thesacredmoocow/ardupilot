@@ -173,7 +173,7 @@ protected:
 
     // output - sends commands to the motors
     void output_armed_stabilizing() override;
-    void output_disarmed();
+    void output_disarmed() override;
 
     // external objects we depend upon
     AP_MotorsHeli_RSC   _main_rotor;            // main rotor

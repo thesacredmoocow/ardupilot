@@ -34,6 +34,7 @@ public:
 
 protected:
     // calculate motor outputs
+    void                output_disarmed() override {}
     void output_armed_stabilizing() override;
 
     const char* _get_frame_string() const override { return "TAILSITTER"; }

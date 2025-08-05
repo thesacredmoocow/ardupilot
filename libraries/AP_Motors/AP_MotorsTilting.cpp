@@ -98,17 +98,49 @@ void AP_MotorsTilting::load_factors(const factor_table &new_table)
 // Need to take the semaphore to enasure the motor factors are not changed during the mixer calculation
 void AP_MotorsTilting::output_to_motors()
 {
-    const float total_angle = _tiltrotor_max_angle - _tiltrotor_min_angle;
-    const float output = (pitch_offset_angle - _tiltrotor_min_angle) / total_angle;
-    const uint16_t output_pwm = (uint16_t)(output * 1000.0) + 1000;
-    SRV_Channels::set_output_pwm(SRV_Channel::k_motor_tilt, output_pwm);
-    SRV_Channels::set_output_pwm(SRV_Channel::k_tiltMotorRear, output_pwm);
+    // const float total_angle = _tiltrotor_max_angle - _tiltrotor_min_angle;
+    // const float output = (pitch_offset_angle - _tiltrotor_min_angle) / total_angle;
+    // const uint16_t output_pwm = (uint16_t)(output * 1000.0) + 1000;
+    // SRV_Channels::set_output_pwm_trimmed(SRV_Channel::k_motor_tilt, output_pwm);
+    // SRV_Channels::set_output_pwm_trimmed(SRV_Channel::k_tiltMotorRear, output_pwm);
+
+    int16_t angle_min_cd = (int16_t)(_tiltrotor_min_angle * 100.0f);
+    int16_t angle_max_cd = (int16_t)(_tiltrotor_min_angle * 100.0f);
+    int16_t angle_target_cd = (int16_t)(pitch_offset_angle * 100.0f);
+
+    SRV_Channels::move_servo(SRV_Channel::k_motor_tilt, angle_target_cd, angle_min_cd, angle_max_cd);
+    SRV_Channels::move_servo(SRV_Channel::k_tiltMotorRear, angle_target_cd, angle_min_cd, angle_max_cd);
     AP_MotorsMatrix::output_to_motors();
 }
 
 void AP_MotorsTilting::set_pitch_angle(float angle)
 {
     pitch_offset_angle = angle;
+}
+
+void AP_MotorsTilting::output_disarmed()
+{
+    int16_t angle_min_cd = (int16_t)(_tiltrotor_min_angle * 100.0f);
+    int16_t angle_max_cd = (int16_t)(_tiltrotor_min_angle * 100.0f);
+    int16_t angle_target_cd = (int16_t)(pitch_offset_angle * 100.0f);
+
+    SRV_Channels::move_servo(SRV_Channel::k_motor_tilt, angle_target_cd, angle_min_cd, angle_max_cd);
+    SRV_Channels::move_servo(SRV_Channel::k_tiltMotorRear, angle_target_cd, angle_min_cd, angle_max_cd);
+
+
+    // const float total_angle = _tiltrotor_max_angle - _tiltrotor_min_angle;
+
+    // const float output = (pitch_offset_angle - _tiltrotor_min_angle) / total_angle; // value 0~1
+
+
+
+
+    // SRV_Channels::set_output_norm(SRV_Channel::k_motor_tilt, 2*output - 1.0f);
+    // SRV_Channels::set_output_norm(SRV_Channel::k_tiltMotorRear, 2*output - 1.0f);
+
+    // const uint16_t output_pwm = (uint16_t)(output * 1400.0) + 800;
+    // SRV_Channels::set_output_pwm_trimmed(SRV_Channel::k_motor_tilt, output_pwm);
+    // SRV_Channels::set_output_pwm_trimmed(SRV_Channel::k_tiltMotorRear, output_pwm);
 }
 
 // output_armed - sends commands to the motors

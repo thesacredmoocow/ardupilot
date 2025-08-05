@@ -59,6 +59,7 @@ public:
 
 protected:
     // output - sends commands to the motors
+    void                output_disarmed() override {}
     void                output_armed_stabilizing() override;
 
     // call vehicle supplied thrust compensation if set

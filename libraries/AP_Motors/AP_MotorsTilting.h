@@ -41,6 +41,7 @@ public:
 
 protected:
 
+    void output_disarmed() override;
     void output_armed_stabilizing() override;
 
     // Do not apply thrust compensation, this is used by Quadplane tiltrotors
