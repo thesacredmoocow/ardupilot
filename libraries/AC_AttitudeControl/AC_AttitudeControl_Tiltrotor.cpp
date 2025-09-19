@@ -283,7 +283,7 @@ void AC_AttitudeControl_Tiltrotor::rate_controller_run() {
         trim.x = 0;
         trim.z = 0;
         trim.y = ToRad(pitch_offset_deg - virtual_pitch_offset_deg);
-        AP::ahrs().set_trim(trim);
+        // AP::ahrs().set_trim(trim);
     }
     else
     {
@@ -292,7 +292,7 @@ void AC_AttitudeControl_Tiltrotor::rate_controller_run() {
         trim.x = 0;
         trim.z = 0;
         trim.y = 0;
-        AP::ahrs().set_trim(trim);
+        // AP::ahrs().set_trim(trim);
 
         // put these all back at zero so no jump transitioning into 5dof
         pitch_offset_deg = 0.0f;

@@ -105,7 +105,7 @@ void AP_MotorsTilting::output_to_motors()
     // SRV_Channels::set_output_pwm_trimmed(SRV_Channel::k_tiltMotorRear, output_pwm);
 
     int16_t angle_min_cd = (int16_t)(_tiltrotor_min_angle * 100.0f);
-    int16_t angle_max_cd = (int16_t)(_tiltrotor_min_angle * 100.0f);
+    int16_t angle_max_cd = (int16_t)(_tiltrotor_max_angle * 100.0f);
     int16_t angle_target_cd = (int16_t)(pitch_offset_angle * 100.0f);
 
     SRV_Channels::move_servo(SRV_Channel::k_motor_tilt, angle_target_cd, angle_min_cd, angle_max_cd);
@@ -121,7 +121,7 @@ void AP_MotorsTilting::set_pitch_angle(float angle)
 void AP_MotorsTilting::output_disarmed()
 {
     int16_t angle_min_cd = (int16_t)(_tiltrotor_min_angle * 100.0f);
-    int16_t angle_max_cd = (int16_t)(_tiltrotor_min_angle * 100.0f);
+    int16_t angle_max_cd = (int16_t)(_tiltrotor_max_angle * 100.0f);
     int16_t angle_target_cd = (int16_t)(pitch_offset_angle * 100.0f);
 
     SRV_Channels::move_servo(SRV_Channel::k_motor_tilt, angle_target_cd, angle_min_cd, angle_max_cd);

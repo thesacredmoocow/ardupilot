@@ -770,9 +770,9 @@ void RC_Channel::init_aux_function(const AUX_FUNC ch_option, const AuxSwitchPos 
     case AUX_FUNC::CAMERA_AUTO_FOCUS:
     case AUX_FUNC::CAMERA_LENS:
 #endif
+    case AUX_FUNC::TILTROTOR_EN:
 #if AP_AHRS_ENABLED
     case AUX_FUNC::AHRS_TYPE:
-    case AUX_FUNC::TILTROTOR_EN:
         run_aux_function(ch_option, ch_flag, AuxFuncTriggerSource::INIT);
         break;
 #endif
