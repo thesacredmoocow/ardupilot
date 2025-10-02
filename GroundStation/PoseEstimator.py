@@ -161,6 +161,7 @@ class PoseEstimator:
             "tvec_body": tvec_body,
             "docking_error": docking_error_BODY_FRD,
             "distance": distance,
+            "attitude": rvec_degrees,
         }
 
 
