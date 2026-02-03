@@ -1,8 +1,7 @@
 import cv2
 import numpy as np
-from typing import Optional, Tuple, Dict, Any
-from pupil_apriltags import Detector
-
+from typing import Optional, Dict, Any
+from VisionTarget.VisionTarget import VisionTarget
 BODY_TO_TAG = (0, 0.13, 0.02)
 TAG_SIZE = 0.055
 
@@ -40,19 +39,11 @@ class PoseEstimator:
         self,
         camera_matrix: np.ndarray,
         dist_coeffs: np.ndarray,
+        vision_target: VisionTarget,
     ) -> None:
         self._camera_matrix = camera_matrix
         self._dist_coeffs = dist_coeffs
-        self._detector = Detector()
-
-        # precompute tag corner object points (tag frame)
-        half_size = TAG_SIZE / 2.0
-        self._obj_points = np.array([
-            [-half_size, half_size, 0],
-            [half_size, half_size, 0],
-            [half_size, -half_size, 0],
-            [-half_size, -half_size, 0]
-        ], dtype=np.float32)
+        self._vision_target = vision_target
 
     def estimate(self, frame_bgr: np.ndarray, draw_on_frame: bool = False) -> Optional[Dict[str, Any]]:
         """
@@ -70,24 +61,19 @@ class PoseEstimator:
         if frame_bgr is None or frame_bgr.size == 0:
             return None
 
-        gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
-        detections = self._detector.detect(gray)
-        if not detections:
+        pose_data = self._vision_target.get_position(frame_bgr)
+        if pose_data is None:
             return None
 
-        # take the first detection (extend if needed for multiple tags)
-        det = detections[0]
+        rvec = pose_data["rvec"]
+        tvec = pose_data["tvec"]
+        det = pose_data.get("detection")
 
-        if draw_on_frame:
+        if draw_on_frame and det is not None:
             frame_bgr = PoseEstimator.plotPoint(frame_bgr, det.center, CENTER_COLOR)
             frame_bgr = PoseEstimator.plotText(frame_bgr, det.center, CENTER_COLOR, det.tag_id)
             for corner in det.corners:
                 frame_bgr = PoseEstimator.plotPoint(frame_bgr, corner, CORNER_COLOR)
-
-        # solve pnp: tag corners (2d) to object points (3d in tag frame)
-        ok, rvec, tvec = cv2.solvePnP(self._obj_points, det.corners, self._camera_matrix, self._dist_coeffs)
-        if not ok:
-            return None
 
         # compute camera position in tag frame: p_c^tag = -R^T * t
         R_cam_tag, _ = cv2.Rodrigues(rvec)
@@ -148,7 +134,8 @@ class PoseEstimator:
                     cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 200, 255), 2)
 
             # draw coordinate axes at the body origin
-            cv2.drawFrameAxes(frame_bgr, self._camera_matrix, self._dist_coeffs, rvec, tvec_body, TAG_SIZE)
+            tag_size = getattr(self._vision_target, "tag_size", TAG_SIZE)
+            cv2.drawFrameAxes(frame_bgr, self._camera_matrix, self._dist_coeffs, rvec, tvec_body, tag_size)
 
         return {
             "success": True,

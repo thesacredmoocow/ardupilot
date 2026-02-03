@@ -6,13 +6,18 @@ Demonstrates real-time camera display using cv2.imshow until keypress.
 import cv2
 import time
 import numpy as np
-# from Camera.WebcamCameraSource import WebcamCameraSource
-from Camera.LucidCameraSource import LucidCameraSource
+from Camera.WebcamCameraSource import WebcamCameraSource
+# from Camera.LucidCameraSource import LucidCameraSource
+from Camera.GstreamerCameraSource import GstreamerCameraSource
 from PoseEstimator import PoseEstimator
+from InsideOutEstimator import InsideOutEstimator
+from VisionTarget.AprilVisionTarget import AprilVisionTarget
+from VisionTarget.IRVisionTarget import IRVisionTarget
 from Pose import Pose
 import math
 import os
 from Docking import DockingManager
+from Utils import quaternion_from_euler
 
 os.environ['MAVLINK20'] = '1'
 
@@ -25,31 +30,23 @@ SYSID = 1
 FC_COMPID = 1
 THIS_COMPID = 192
 
-SEND_MAVLINK = True
+SEND_MAVLINK = False
 
-def quaternion_from_euler(roll, pitch, yaw):
-    cy = math.cos(yaw * 0.5)
-    sy = math.sin(yaw * 0.5)
-    cp = math.cos(pitch * 0.5)
-    sp = math.sin(pitch * 0.5)
-    cr = math.cos(roll * 0.5)
-    sr = math.sin(roll * 0.5)
-    return [
-        cr * cp * cy + sr * sp * sy,
-        sr * cp * cy - cr * sp * sy,
-        cr * sp * cy + sr * cp * sy,
-        sr * sp * cy - cr * cp * sy
-    ]
+INSIDE_OUT_ESTIMATOR = True
 
 def main():
 
     print("Press 'q' to quit, 's' to save current frame")
 
-    with LucidCameraSource() as camera:
+    with GstreamerCameraSource("rtsp://192.168.193.53:8554/baseaxipcie1000120000rp1i2c88000imx7081a") as camera:
+    # with WebcamCameraSource(camera_index=0) as camera:
         cameraMatrix = camera.get_camera_matrix()
         distCoeffs = camera.get_dist_coeffs()
 
-        pose_estimator = PoseEstimator(cameraMatrix, distCoeffs)
+        # vision_target = AprilVisionTarget(tag_size=0.055, camera_matrix=cameraMatrix, dist_coeffs=distCoeffs)
+        vision_target = IRVisionTarget(camera_matrix=cameraMatrix, dist_coeffs=distCoeffs)
+        pose_estimator = PoseEstimator(cameraMatrix, distCoeffs, vision_target)
+        inside_out_estimator = InsideOutEstimator(cameraMatrix, distCoeffs, vision_target)
 
         if SEND_MAVLINK:
             mavlink = mavutil.mavlink_connection(f"tcp:{MAVLINK_IP}:{MAVLINK_PORT}", source_system=SYSID, source_component=THIS_COMPID)
@@ -91,13 +88,17 @@ def main():
                 frame = camera.get_latest_frame()
                 if frame is not None:
                     timestamp = camera._frame_timestamp
-                    pose_estimate = pose_estimator.estimate(frame, draw_on_frame=True)
+                    # pose_estimate = pose_estimator.estimate(frame, draw_on_frame=True)
+                    pose_estimate = inside_out_estimator.estimate(frame, draw_on_frame=True)
                     if pose_estimate is not None:
                         cb_x, cb_y, cb_z = pose_estimate["docking_error"].flatten().tolist()
                         docking_manager.update_position_error(cb_x, cb_y, cb_z, pose_estimate["success"])
 
+                        if INSIDE_OUT_ESTIMATOR:
+                            pose.update_pos(pose_estimate["tag_in_body"][0], pose_estimate["tag_in_body"][1], pose_estimate["tag_in_body"][2], timestamp*1000000)
+                        else:
+                            pose.update_pos(pose_estimate["cam_in_body"][0], pose_estimate["cam_in_body"][1], pose_estimate["cam_in_body"][2], timestamp*1000000)
                         
-                        pose.update_pos(pose_estimate["cam_in_body"][0], pose_estimate["cam_in_body"][1], pose_estimate["cam_in_body"][2], timestamp*1000000)
                         fwd_error, right_error, down_error = pose_estimate["docking_error"].flatten().tolist()
                         
                         if mavlink is not None:
