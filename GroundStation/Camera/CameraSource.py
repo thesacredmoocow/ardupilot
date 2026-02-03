@@ -4,7 +4,7 @@ import cv2
 from abc import ABC, abstractmethod
 from typing import Optional, Tuple
 import os
-import pickle
+import json
 import numpy as np
 
 
@@ -18,6 +18,8 @@ class CameraSource(ABC):
         """
         Initialize the camera source.fr
         """
+
+        print("camera intting")
         
         # Threading variables
         self._capture_thread = None
@@ -36,15 +38,38 @@ class CameraSource(ABC):
         self._cameraMatrix = None
         self._distCoeffs = None
 
-        if os.path.exists('Camera/calibration.pckl'):
-            f = open('Camera/calibration.pckl', 'rb')
-            (cameraMatrix, distCoeffs, _, _) = pickle.load(f)
-            f.close()
-            if cameraMatrix is None or distCoeffs is None:
-                pass
-            else:
-                self._cameraMatrix = cameraMatrix
-                self._distCoeffs = distCoeffs
+        # Prefer JSON camera parameters (produced by camera calibration).
+        # Resolve the path relative to this source file so the code works
+        # regardless of the current working directory when the program is run.
+        base_dir = os.path.dirname(__file__)
+        json_path = os.path.join(base_dir, 'camera_params.json')
+        if os.path.exists(json_path):
+            # camera params file found next to this module
+            try:
+                with open(json_path, 'r') as f:
+                    params = json.load(f)
+
+                cameraMatrix = params.get('camera_matrix')
+                distCoeffs = params.get('dist_coeff')
+
+                if cameraMatrix is not None:
+                    # camera_matrix expected as a 3x3 nested list
+                    self._cameraMatrix = np.array(cameraMatrix, dtype=float)
+
+                if distCoeffs is not None:
+                    # dist_coeff may be a nested list (e.g. [[...]]) or flat list
+                    if isinstance(distCoeffs, list) and len(distCoeffs) == 1 and isinstance(distCoeffs[0], list):
+                        dc = distCoeffs[0]
+                    else:
+                        dc = distCoeffs
+                    self._distCoeffs = np.array(dc, dtype=float)
+            
+            except Exception as e:
+                print('failed')
+                print(f"Failed to load camera params from {json_path}: {e}")
+
+        else:
+            print('what is what')
 
     def get_camera_matrix(self) -> Optional[np.ndarray]:
         return self._cameraMatrix

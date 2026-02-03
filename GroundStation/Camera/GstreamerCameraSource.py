@@ -34,10 +34,10 @@ class GstreamerCameraSource(CameraSource):
             # The connection string (RTSP URL or pipeline) is passed directly to VideoCapture
             self._camera = cv2.VideoCapture(self.pipeline, cv2.CAP_FFMPEG)
             
-            print("Camera opened")
             if not self._camera.isOpened():
                 print("Failed to open camera connection")
                 return False
+            print("Camera opened")
                 
             # Set additional OpenCV properties for better performance
             self._camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Reduce buffer size for lower latency

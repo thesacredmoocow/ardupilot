@@ -11,7 +11,7 @@ from Camera.WebcamCameraSource import WebcamCameraSource
 from Camera.GstreamerCameraSource import GstreamerCameraSource
 from PoseEstimator import PoseEstimator
 from InsideOutEstimator import InsideOutEstimator
-from VisionTarget.AprilVisionTarget import AprilVisionTarget
+# from VisionTarget.AprilVisionTarget import AprilVisionTarget
 from VisionTarget.IRVisionTarget import IRVisionTarget
 from Pose import Pose
 import math
@@ -38,7 +38,7 @@ def main():
 
     print("Press 'q' to quit, 's' to save current frame")
 
-    with GstreamerCameraSource("rtsp://192.168.193.53:8554/baseaxipcie1000120000rp1i2c88000imx7081a") as camera:
+    with GstreamerCameraSource("rtsp://10.110.167.68:8554/baseaxipcie1000120000rp1i2c88000imx7081a") as camera:
     # with WebcamCameraSource(camera_index=0) as camera:
         cameraMatrix = camera.get_camera_matrix()
         distCoeffs = camera.get_dist_coeffs()
