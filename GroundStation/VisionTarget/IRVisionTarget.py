@@ -10,7 +10,10 @@ class IRVisionTarget(VisionTarget):
         self.ir_estimator = UprightTPoseEstimator(self.camera_matrix, self.dist_coeffs)
 
     def get_position(self, frame_bgr: np.ndarray) -> Optional[Dict[str, Any]]:
-        success, rvec, tvec = self.ir_estimator.process_frame(frame_bgr, 200)
+        cv2_results = self.ir_estimator.process_frame(frame_bgr, 200)
+        if cv2_results is None:
+            return None
+        success, rvec, tvec = cv2_results
         if not success:
             return None
 

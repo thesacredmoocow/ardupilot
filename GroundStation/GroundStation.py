@@ -18,6 +18,7 @@ import math
 import os
 from Docking import DockingManager
 from Utils import quaternion_from_euler
+from DebugVisualizer.UDPclient import UDPclient
 
 os.environ['MAVLINK20'] = '1'
 
@@ -33,6 +34,9 @@ THIS_COMPID = 192
 SEND_MAVLINK = False
 
 INSIDE_OUT_ESTIMATOR = True
+UDP_HOST_IP = os.environ.get("UDP_HOST_IP", "127.0.0.1")
+UDP_HOST_PORT = int(os.environ.get("UDP_HOST_PORT", "5005"))
+UDP_SOURCE = os.environ.get("UDP_SOURCE", "groundstation_ir")
 
 def main():
 
@@ -47,6 +51,7 @@ def main():
         vision_target = IRVisionTarget(camera_matrix=cameraMatrix, dist_coeffs=distCoeffs)
         pose_estimator = PoseEstimator(cameraMatrix, distCoeffs, vision_target)
         inside_out_estimator = InsideOutEstimator(cameraMatrix, distCoeffs, vision_target)
+        udp_client = UDPclient(UDP_HOST_IP, UDP_HOST_PORT, source=UDP_SOURCE)
 
         if SEND_MAVLINK:
             mavlink = mavutil.mavlink_connection(f"tcp:{MAVLINK_IP}:{MAVLINK_PORT}", source_system=SYSID, source_component=THIS_COMPID)
@@ -91,6 +96,16 @@ def main():
                     # pose_estimate = pose_estimator.estimate(frame, draw_on_frame=True)
                     pose_estimate = inside_out_estimator.estimate(frame, draw_on_frame=True)
                     if pose_estimate is not None:
+                        rvec = pose_estimate.get("rvec_tag")
+                        tvec = pose_estimate.get("tvec_tag")
+                        if rvec is not None and tvec is not None:
+                            udp_client.send_rvec_tvec(
+                                parent="/world",
+                                child="/ir_target",
+                                rvec=rvec,
+                                tvec=tvec,
+                                tvec_scale=0.01,
+                            )
                         cb_x, cb_y, cb_z = pose_estimate["docking_error"].flatten().tolist()
                         docking_manager.update_position_error(cb_x, cb_y, cb_z, pose_estimate["success"])
 
@@ -302,6 +317,7 @@ def main():
     # Clean up
     cv2.destroyAllWindows()
     mavlink.close()
+    udp_client.close()
 
 if __name__ == "__main__":
     main()

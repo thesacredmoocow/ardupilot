@@ -5,8 +5,12 @@ import os
 import itertools
 import time
 from picamera2 import Picamera2
+from DebugVisualizer.UDPclient import UDPclient
 
 THRESHOLD_VALUE = 240  # adjust based on lighting
+UDP_HOST_IP = os.environ.get("UDP_HOST_IP", "127.0.0.1")
+UDP_HOST_PORT = int(os.environ.get("UDP_HOST_PORT", "5005"))
+UDP_SOURCE = os.environ.get("UDP_SOURCE", "ir_detector")
 
 
 class PiCameraFrameSource:
@@ -205,6 +209,7 @@ if __name__ == "__main__":
     estimator = UprightTPoseEstimator(K, D)
 
     cam = PiCameraFrameSource(size=(2304, 1296), fps=30) # updated to keep size consistent with calibration intrinsics
+    udp_client = UDPclient(UDP_HOST_IP, UDP_HOST_PORT, source=UDP_SOURCE)
 
     # Create a tuning window
     cv2.namedWindow("Tuning")
@@ -247,6 +252,13 @@ if __name__ == "__main__":
         if cv2_results is not None:
             success, rvec, tvec = cv2_results
             if success:
+                udp_client.send_rvec_tvec(
+                    parent="/world",
+                    child="/ir_target",
+                    rvec=rvec,
+                    tvec=tvec,
+                    tvec_scale=0.01,
+                )
                 axis_length = 5.0  # same units as model points (cm)
                 cv2.drawFrameAxes(
                     frame,
@@ -266,4 +278,5 @@ if __name__ == "__main__":
             break
 
     cam.release()
+    udp_client.close()
     cv2.destroyAllWindows()
