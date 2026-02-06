@@ -4,6 +4,9 @@ import json
 import os
 import itertools
 import time
+from picamera2 import Picamera2
+
+THRESHOLD_VALUE = 240  # adjust based on lighting
 
 
 class PiCameraFrameSource:
@@ -131,7 +134,7 @@ class UprightTPoseEstimator:
                 2
             )
 
-        return cv2.solvePnP(
+        cv2_results = cv2.solvePnP(
             self.model_points, sorted_pts,
             self.camera_matrix, self.dist_coeffs,
             flags=cv2.SOLVEPNP_SQPNP
@@ -160,6 +163,12 @@ class UprightTPoseEstimator:
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
             print(tvec)
+
+            cv2.imshow("Pose Estimation", frame)
+            cv2.imshow("Blob Detection", debug_blob_frame)
+            cv2.imshow("Thresholded Mask", mask)
+
+        return cv2_results
 
         return frame, mask, debug_blob_frame
 
@@ -233,7 +242,6 @@ def nothing(x):
     pass
 
 if __name__ == "__main__":
-    from picamera2 import Picamera2
     # Load your specific calibration
     with open("camera_params.json", "r") as f:
         data = json.load(f)
@@ -241,34 +249,7 @@ if __name__ == "__main__":
 
     estimator = UprightTPoseEstimator(K, D)
 
-    # Your gst-launch command translated to an OpenCV-friendly pipeline:
-    # - replace autovideosink with appsink
-    # - add drop=true and sync=false to keep latency low
-    # gst_pipeline = (
-    #     "rtspsrc location=rtsp://127.0.0.1:8554/baseaxipcie1000120000rp1i2c88000imx7081a "
-    #     "latency=0 is-live=true ! "
-    #     "queue ! "
-    #     "decodebin ! "
-    #     "videoconvert ! "
-    #     "appsink drop=true sync=false"
-    # )
-
-    # os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|max_delay;0"
-
-    # RTSP_URL = "rtsp://192.168.137.108:8554/baseaxipcie1000120000rp1i2c88000imx7081a"
-
-    # cap = cv2.VideoCapture(RTSP_URL, cv2.CAP_FFMPEG)
-
-    # cap = cv2.VideoCapture(gst_pipeline, cv2.CAP_GSTREAMER)
-
-    # cap = cv2.VideoCapture(2)
-    # if not cap.isOpened():
-    #     raise RuntimeError(
-    #         "Failed to open GStreamer pipeline in OpenCV.\n"
-    #         "Tip: confirm OpenCV was built with GStreamer support, and test the RTSP stream with gst-launch."
-    #     )
-
-    cam = PiCameraFrameSource(size=(1640, 1232), fps=30)
+    cam = PiCameraFrameSource(size=(2304, 1296), fps=30) # updated to keep size consistent with calibration intrinsics
 
     # Create a tuning window
     cv2.namedWindow("Tuning")
@@ -279,13 +260,13 @@ if __name__ == "__main__":
         if not ret:
             break
 
-        t_val = cv2.getTrackbarPos("Threshold", "Tuning")
-        main_out, mask_out, blob_out = estimator.process_frame(frame, t_val)
+        # t_val = cv2.getTrackbarPos("Threshold", "Tuning")
+        main_out, mask_out, blob_out = estimator.process_frame(frame, THRESHOLD_VALUE)
 
         if main_out is not None:
-            cv2.imshow("1. Binary Mask (Adjust Threshold)", mask_out)
-            cv2.imshow("2. Detected Blobs", blob_out)
-            cv2.imshow("3. Final Pose", main_out)
+            # cv2.imshow("1. Binary Mask (Adjust Threshold)", mask_out)
+            # cv2.imshow("2. Detected Blobs", blob_out)
+            cv2.imwrite("final_pose.jpg", main_out)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
