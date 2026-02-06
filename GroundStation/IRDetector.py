@@ -34,6 +34,7 @@ class UprightTPoseEstimator:
     def __init__(self, camera_matrix, dist_coeffs):
         self.camera_matrix = np.array(camera_matrix, dtype=np.float32)
         self.dist_coeffs = np.array(dist_coeffs, dtype=np.float32)
+        self.last_debug = None
 
         # 3D Model Points (in cm)
         # Upside-down T: stem point is above the horizontal bar in image coords.
@@ -65,7 +66,6 @@ class UprightTPoseEstimator:
         centers = []
         areas = []
         circularities = []
-        debug_blob_frame = frame.copy()
         min_area = 5.0
         min_circularity = 0.45
         min_solidity = 0.8
@@ -94,20 +94,21 @@ class UprightTPoseEstimator:
                 centers.append([cX, cY])
                 areas.append(area)
                 circularities.append(circularity)
-                cv2.circle(debug_blob_frame, (int(cX), int(cY)), 5, (0, 255, 255), 1)
         # return frame, mask, debug_blob_frame
         # Need exactly 4 blobs
         if len(centers) < 4:
             print(f"Detected {len(centers)} blobs, need 4.")
-            return None, None, None
+            self.last_debug = {"mask": mask, "centers": centers, "sorted_pts": None}
+            return None
 
         # 4. Select best 4 candidates in upside-down T formation
-        centers = np.array(centers, dtype=np.float32)
+        all_centers = np.array(centers, dtype=np.float32)
         areas = np.array(areas, dtype=np.float32)
         circularities = np.array(circularities, dtype=np.float32)
-        selected = self.select_t_points(centers, areas, circularities)
+        selected = self.select_t_points(all_centers, areas, circularities)
         if selected is None:
-            return None, None, None
+            self.last_debug = {"mask": mask, "centers": all_centers, "sorted_pts": None}
+            return None
         centers = selected
 
         # Refine
@@ -117,60 +118,14 @@ class UprightTPoseEstimator:
         # Sort
         sorted_pts = self.sort_t_points(refined_pts)
 
-        # ---- DEBUG VISUALIZATION OF PnP POINT ORDER ----
-        labels = ["1: BM (origin)", "2: BL", "3: BR", "4: ST"]
-        colors = [(0, 0, 255), (0, 255, 0), (255, 0, 0), (0, 255, 255)]
-
-        for i, pt in enumerate(sorted_pts):
-            x, y = int(pt[0]), int(pt[1])
-            cv2.circle(debug_blob_frame, (x, y), 6, colors[i], -1)
-            cv2.putText(
-                debug_blob_frame,
-                labels[i],
-                (x + 8, y - 8),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                colors[i],
-                2
-            )
-
-        cv2_results = cv2.solvePnP(
-            self.model_points, sorted_pts,
-            self.camera_matrix, self.dist_coeffs,
-            flags=cv2.SOLVEPNP_SQPNP
-        )
-
         success, rvec, tvec = cv2.solvePnP(
             self.model_points, sorted_pts,
             self.camera_matrix, self.dist_coeffs,
             flags=cv2.SOLVEPNP_SQPNP
         )
-
-        if success:
-            axis_length = 5.0  # same units as model points (cm)
-            cv2.drawFrameAxes(
-                frame,
-                self.camera_matrix,
-                self.dist_coeffs,
-                rvec,
-                tvec,
-                axis_length,
-                3
-            )
-
-            for i, pt in enumerate(sorted_pts):
-                cv2.putText(frame, str(i), tuple(pt.astype(int)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-            print(tvec)
-
-            cv2.imshow("Pose Estimation", frame)
-            cv2.imshow("Blob Detection", debug_blob_frame)
-            cv2.imshow("Thresholded Mask", mask)
-
+        cv2_results = (success, rvec, tvec)
+        self.last_debug = {"mask": mask, "centers": all_centers, "sorted_pts": sorted_pts}
         return cv2_results
-
-        return frame, mask, debug_blob_frame
 
     def sort_t_points(self, points):
         pts = np.array(points)
@@ -261,12 +216,51 @@ if __name__ == "__main__":
             break
 
         # t_val = cv2.getTrackbarPos("Threshold", "Tuning")
-        main_out, mask_out, blob_out = estimator.process_frame(frame, THRESHOLD_VALUE)
+        cv2_results = estimator.process_frame(frame, THRESHOLD_VALUE)
+        debug = estimator.last_debug
 
-        if main_out is not None:
+        if debug is not None:
+            mask_out = debug["mask"]
+            debug_blob_frame = frame.copy()
+            for cX, cY in debug["centers"]:
+                cv2.circle(debug_blob_frame, (int(cX), int(cY)), 5, (0, 255, 255), 1)
+
+            if debug["sorted_pts"] is not None:
+                labels = ["1: BM (origin)", "2: BL", "3: BR", "4: ST"]
+                colors = [(0, 0, 255), (0, 255, 0), (255, 0, 0), (0, 255, 255)]
+                for i, pt in enumerate(debug["sorted_pts"]):
+                    x, y = int(pt[0]), int(pt[1])
+                    cv2.circle(debug_blob_frame, (x, y), 6, colors[i], -1)
+                    cv2.putText(
+                        debug_blob_frame,
+                        labels[i],
+                        (x + 8, y - 8),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.5,
+                        colors[i],
+                        2
+                    )
+
             # cv2.imshow("1. Binary Mask (Adjust Threshold)", mask_out)
-            # cv2.imshow("2. Detected Blobs", blob_out)
-            cv2.imwrite("final_pose.jpg", main_out)
+            # cv2.imshow("2. Detected Blobs", debug_blob_frame)
+
+        if cv2_results is not None:
+            success, rvec, tvec = cv2_results
+            if success:
+                axis_length = 5.0  # same units as model points (cm)
+                cv2.drawFrameAxes(
+                    frame,
+                    K,
+                    D,
+                    rvec,
+                    tvec,
+                    axis_length,
+                    3
+                )
+                for i, pt in enumerate(debug["sorted_pts"]):
+                    cv2.putText(frame, str(i), tuple(pt.astype(int)),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                cv2.imwrite("final_pose.jpg", frame)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
