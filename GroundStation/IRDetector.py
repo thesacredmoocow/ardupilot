@@ -207,8 +207,8 @@ if __name__ == "__main__":
     cam = PiCameraFrameSource(size=(2304, 1296), fps=30) # updated to keep size consistent with calibration intrinsics
 
     # Create a tuning window
-    cv2.namedWindow("Tuning")
-    cv2.createTrackbar("Threshold", "Tuning", 240, 255, nothing)
+    # cv2.namedWindow("Tuning")
+    # cv2.createTrackbar("Threshold", "Tuning", 240, 255, nothing)
 
     while True:
         ret, frame = cam.read()
