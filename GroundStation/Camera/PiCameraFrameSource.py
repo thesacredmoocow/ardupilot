@@ -1,0 +1,60 @@
+import time
+from typing import Optional, Tuple
+
+import cv2
+import numpy as np
+from picamera2 import Picamera2
+
+from Camera.CameraSource import CameraSource
+
+
+class PiCameraFrameSource(CameraSource):
+    """
+    Camera source implementation backed by Picamera2.
+    Provides frames in OpenCV BGR format via the shared CameraSource API.
+    """
+
+    def __init__(self, size: Tuple[int, int] = (2304, 1296), fps: int = 30):
+        super().__init__()
+        self.size = size
+        self.fps = fps
+
+    def _initialize_camera(self) -> bool:
+        print("Starting PiCamera2 initialization")
+        try:
+            self._camera = Picamera2()
+            config = self._camera.create_video_configuration(
+                main={"size": self.size, "format": "RGB888"},
+                controls={"FrameRate": self.fps},
+            )
+            self._camera.configure(config)
+            self._camera.start()
+            # Let auto-exposure/awb settle briefly before capture loop starts.
+            time.sleep(0.5)
+
+            self._is_initialized = True
+            print("PiCamera2 initialized successfully")
+            return True
+        except Exception as e:
+            print(f"Failed to initialize PiCamera2: {e}")
+            return False
+
+    def _capture_single_frame(self) -> Optional[np.ndarray]:
+        if not self._camera:
+            return None
+
+        try:
+            rgb = self._camera.capture_array()
+            return cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+        except Exception:
+            return None
+
+    def _cleanup_camera(self):
+        if self._camera:
+            try:
+                self._camera.stop()
+            except Exception:
+                pass
+            self._camera = None
+        self._is_initialized = False
+

@@ -6,9 +6,11 @@ Demonstrates real-time camera display using cv2.imshow until keypress.
 import cv2
 import time
 import numpy as np
+import json
+from pathlib import Path
 from Camera.WebcamCameraSource import WebcamCameraSource
 # from Camera.LucidCameraSource import LucidCameraSource
-from Camera.GstreamerCameraSource import GstreamerCameraSource
+from Camera.PiCameraFrameSource import PiCameraFrameSource
 from PoseEstimator import PoseEstimator
 from InsideOutEstimator import InsideOutEstimator
 from VisionTarget.AprilVisionTarget import AprilVisionTarget
@@ -34,14 +36,31 @@ SEND_MAVLINK = False
 
 INSIDE_OUT_ESTIMATOR = True
 
+
+def load_camera_params():
+    here = Path(__file__).resolve().parent
+    candidate_paths = [
+        here / "camera_params.json",
+        here / "Camera" / "camera_params.json",
+    ]
+
+    for camera_params_path in candidate_paths:
+        if camera_params_path.exists():
+            with open(camera_params_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            camera_matrix = np.array(data["camera_matrix"], dtype=np.float32)
+            dist_coeffs = np.array(data["dist_coeff"], dtype=np.float32)
+            return camera_matrix, dist_coeffs
+
+    raise FileNotFoundError("Could not find camera_params.json in GroundStation/ or GroundStation/Camera/")
+
 def main():
 
     print("Press 'q' to quit, 's' to save current frame")
 
-    with GstreamerCameraSource("rtsp://10.110.167.68:8554/baseaxipcie1000120000rp1i2c88000imx7081a") as camera:
+    with PiCameraFrameSource(size=(2304, 1296), fps=30) as camera:
     # with WebcamCameraSource(camera_index=0) as camera:
-        cameraMatrix = camera.get_camera_matrix()
-        distCoeffs = camera.get_dist_coeffs()
+        cameraMatrix, distCoeffs = load_camera_params()
 
         vision_target = AprilVisionTarget(tag_size=0.055, camera_matrix=cameraMatrix, dist_coeffs=distCoeffs)
         # vision_target = IRVisionTarget(camera_matrix=cameraMatrix, dist_coeffs=distCoeffs)
@@ -91,6 +110,7 @@ def main():
                     # pose_estimate = pose_estimator.estimate(frame, draw_on_frame=True)
                     pose_estimate = inside_out_estimator.estimate(frame, draw_on_frame=True)
                     if pose_estimate is not None:
+                        print(pose_estimate["tvec_tag"].flatten().tolist())
                         cb_x, cb_y, cb_z = pose_estimate["docking_error"].flatten().tolist()
                         docking_manager.update_position_error(cb_x, cb_y, cb_z, pose_estimate["success"])
 
@@ -209,7 +229,7 @@ def main():
                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, state_color, 2)
                     last_frame_time = time.time()
 
-                    cv2.imshow('Result', frame)
+                    cv2.imwrite('Result.jpg', frame)
 
                     # Handle key presses
                     key = cv2.waitKey(1) & 0xFF
@@ -301,7 +321,8 @@ def main():
     
     # Clean up
     cv2.destroyAllWindows()
-    mavlink.close()
+    if mavlink is not None:
+        mavlink.close()
 
 if __name__ == "__main__":
     main()
