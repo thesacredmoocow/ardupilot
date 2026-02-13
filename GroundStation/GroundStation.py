@@ -120,6 +120,7 @@ def main():
                             pose.update_pos(pose_estimate["cam_in_body"][0], pose_estimate["cam_in_body"][1], pose_estimate["cam_in_body"][2], timestamp*1000000)
                         
                         fwd_error, right_error, down_error = pose_estimate["docking_error"].flatten().tolist()
+                        print(f"Docking error (fwd, right, down): {fwd_error:.3f}, {right_error:.3f}, {down_error:.3f}")
                         
                         if mavlink is not None:
                             mavlink.mav.landing_target_send(

@@ -18,7 +18,7 @@ CAMERA_MOUNT_YAW = 0.0    # radians
 
 # Desired tag position when docked (in body frame: Forward, Right, Down)
 # This is where we want the tag to be relative to the body origin
-DESIRED_TAG_POSITION = (1.0, 0.0, 0.0)  # 1 meter forward, centered, at body height
+DESIRED_TAG_POSITION = (0.75, 0.0, 0.0)  # 1 meter forward, centered, at body height
 
 LINE_LENGTH = 5
 CENTER_COLOR = (0, 255, 0)
