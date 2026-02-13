@@ -55,7 +55,7 @@ class DOFDetector:
         mavlink_port: int = 14545,
     ):
         self._camera = PiCameraFrameSource(
-            camera_index=camera_index,
+            camera_index=0,
             size=frame_size,
             fps=fps,
             output_size=output_size,
@@ -136,6 +136,8 @@ class DOFDetector:
             self._init_mavlink()
             while not self._stop_event.is_set():
                 ok, frame = self._camera.read()
+                cv2.imwrite("saved_dof.png", frame)
+                print('saved o,g')
                 now = time.time()
                 if not ok or frame is None:
                     time.sleep(0.01)
