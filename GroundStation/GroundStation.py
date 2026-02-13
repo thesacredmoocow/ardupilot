@@ -11,8 +11,8 @@ from Camera.WebcamCameraSource import WebcamCameraSource
 from Camera.GstreamerCameraSource import GstreamerCameraSource
 from PoseEstimator import PoseEstimator
 from InsideOutEstimator import InsideOutEstimator
-# from VisionTarget.AprilVisionTarget import AprilVisionTarget
-from VisionTarget.IRVisionTarget import IRVisionTarget
+from VisionTarget.AprilVisionTarget import AprilVisionTarget
+# from VisionTarget.IRVisionTarget import IRVisionTarget
 from Pose import Pose
 import math
 import os
@@ -24,7 +24,7 @@ os.environ['MAVLINK20'] = '1'
 from pymavlink import mavutil
 from time import time_ns
 
-MAVLINK_IP = "192.168.0.107"
+MAVLINK_IP = "127.0.0.1"
 MAVLINK_PORT = "5760"
 SYSID = 1
 FC_COMPID = 1
@@ -43,8 +43,8 @@ def main():
         cameraMatrix = camera.get_camera_matrix()
         distCoeffs = camera.get_dist_coeffs()
 
-        # vision_target = AprilVisionTarget(tag_size=0.055, camera_matrix=cameraMatrix, dist_coeffs=distCoeffs)
-        vision_target = IRVisionTarget(camera_matrix=cameraMatrix, dist_coeffs=distCoeffs)
+        vision_target = AprilVisionTarget(tag_size=0.055, camera_matrix=cameraMatrix, dist_coeffs=distCoeffs)
+        # vision_target = IRVisionTarget(camera_matrix=cameraMatrix, dist_coeffs=distCoeffs)
         pose_estimator = PoseEstimator(cameraMatrix, distCoeffs, vision_target)
         inside_out_estimator = InsideOutEstimator(cameraMatrix, distCoeffs, vision_target)
 

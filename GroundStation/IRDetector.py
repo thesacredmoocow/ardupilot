@@ -18,12 +18,12 @@ class PiCameraFrameSource:
         )
         self.picam2.configure(config)
         self.picam2.start()
-        self.picam2.set_controls({"ExposureTime": 300})
+        self.picam2.set_controls({"ExposureTime": 1})
         time.sleep(0.5)
 
     def read(self):
         rgb = self.picam2.capture_array()
-        rgb = cv2.resize(rgb, (640, 480))
+        # rgb = cv2.resize(rgb, (640, 480))
         bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
         return True, bgr
 
@@ -211,6 +211,7 @@ if __name__ == "__main__":
     # cv2.createTrackbar("Threshold", "Tuning", 240, 255, nothing)
 
     while True:
+        time.sleep(0.3)
         ret, frame = cam.read()
         if not ret:
             break
@@ -246,6 +247,7 @@ if __name__ == "__main__":
 
         if cv2_results is not None:
             success, rvec, tvec = cv2_results
+            print(f"Translation Vector (tvec): x={tvec[0][0]:.2f}, y={tvec[1][0]:.2f}, z={tvec[2][0]:.2f} | Rotation Vector (rvec): gx={rvec[0][0]:.2f}, gy={rvec[1][0]:.2f}, gz={rvec[2][0]:.2f}")
             if success:
                 axis_length = 5.0  # same units as model points (cm)
                 cv2.drawFrameAxes(
