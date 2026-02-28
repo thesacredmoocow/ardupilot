@@ -4,6 +4,7 @@ from typing import Optional, Tuple
 import cv2
 import numpy as np
 from picamera2 import Picamera2
+from libcamera import controls
 
 from Camera.CameraSource import CameraSource
 
@@ -15,7 +16,7 @@ class PiCameraFrameSource(CameraSource):
     """
 
     def __init__(self, size: Tuple[int, int] = (2304, 1296), fps: int = 30):
-        super().__init__()
+        super().__init__(json_path="/home/raspi/ardupilot/GroundStation/Camera/PiCamera/Calibration/camera_params.json")
         self.size = size
         self.fps = fps
 
@@ -25,7 +26,10 @@ class PiCameraFrameSource(CameraSource):
             self._camera = Picamera2()
             config = self._camera.create_video_configuration(
                 main={"size": self.size, "format": "RGB888"},
-                controls={"FrameRate": self.fps},
+                controls={
+                    "FrameRate": self.fps,
+                    "AfMode": controls.AfModeEnum.Continuous
+                },
             )
             self._camera.configure(config)
             self._camera.start()

@@ -5,10 +5,15 @@
 # - OpenCV-Python tutorial for calibration: http://opencv-python-tutroals.readthedocs.io/en/latest/py_tutorials/py_calib3d/py_calibration/py_calibration.html
 #   - Variable names were changed for clarity
 
+import json
 import numpy
 import cv2
 import pickle
 import glob
+
+IMAGE_PATH = "/home/raspi/ardupilot/GroundStation/Camera/PiCamera/Calibration/"
+JSON_PATH = "/home/raspi/ardupilot/GroundStation/Camera/PiCamera/Calibration/camera_params.json"
+PKL_PATH = "/home/raspi/ardupilot/GroundStation/Camera/PiCamera/Calibration/calibration.pckl"
 
 # Create arrays you'll use to store object points and image points from all images processed
 objpoints = [] # 3D point in real world space where chess squares are
@@ -32,7 +37,7 @@ objp[:,:2] = numpy.mgrid[0:CHESSBOARD_CORNERS_ROWCOUNT,0:CHESSBOARD_CORNERS_COLC
 # Need a set of images or a video taken with the camera you want to calibrate
 # I'm using a set of images taken with the camera with the naming convention:
 # 'camera-pic-of-chessboard-<NUMBER>.jpg'
-images = glob.glob('./*.jpg')
+images = glob.glob(IMAGE_PATH + '*.jpg')
 # All images used should be the same size, which if taken with the same camera shouldn't be a problem
 imageSize = None # Determined at runtime
 
@@ -105,10 +110,14 @@ print(cameraMatrix)
 print(distCoeffs)
     
 # Save values to be used where matrix+dist is required, for instance for posture estimation
-# I save files in a pickle file, but you can use yaml or whatever works for you
-f = open('calibration.pckl', 'wb')
-pickle.dump((cameraMatrix, distCoeffs, rvecs, tvecs), f)
-f.close()
-    
+with open(JSON_PATH, 'w') as f:
+    json.dump({
+        "camera_matrix": cameraMatrix.tolist(),
+        "dist_coeff": distCoeffs.tolist(),
+    }, f, indent=2)
+
+with open(PKL_PATH, 'wb') as f:
+    pickle.dump((cameraMatrix, distCoeffs, rvecs, tvecs), f)
+
 # Print to console our success
-print('Calibration successful. Calibration file used: {}'.format('calibration.pckl'))
+print('Calibration successful. JSON: {}  PKL: {}'.format(JSON_PATH, PKL_PATH))

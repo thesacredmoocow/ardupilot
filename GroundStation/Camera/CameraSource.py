@@ -14,7 +14,7 @@ class CameraSource(ABC):
     Provides thread-safe access to camera frames and new frame detection.
     """
     
-    def __init__(self):
+    def __init__(self, json_path: str = 'camera_params.json'):
         """
         Initialize the camera source.fr
         """
@@ -42,7 +42,7 @@ class CameraSource(ABC):
         # Resolve the path relative to this source file so the code works
         # regardless of the current working directory when the program is run.
         base_dir = os.path.dirname(__file__)
-        json_path = os.path.join(base_dir, 'camera_params.json')
+        json_path = os.path.join(base_dir, json_path)
         if os.path.exists(json_path):
             # camera params file found next to this module
             try:

@@ -30,29 +30,11 @@ MAVLINK_IP = "127.0.0.1"
 MAVLINK_PORT = "5760"
 SYSID = 1
 FC_COMPID = 1
-THIS_COMPID = 192
+THIS_COMPID = 191
 
-SEND_MAVLINK = False
+SEND_MAVLINK = True
 
 INSIDE_OUT_ESTIMATOR = True
-
-
-def load_camera_params():
-    here = Path(__file__).resolve().parent
-    candidate_paths = [
-        here / "camera_params.json",
-        here / "Camera" / "camera_params.json",
-    ]
-
-    for camera_params_path in candidate_paths:
-        if camera_params_path.exists():
-            with open(camera_params_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            camera_matrix = np.array(data["camera_matrix"], dtype=np.float32)
-            dist_coeffs = np.array(data["dist_coeff"], dtype=np.float32)
-            return camera_matrix, dist_coeffs
-
-    raise FileNotFoundError("Could not find camera_params.json in GroundStation/ or GroundStation/Camera/")
 
 def main():
 
@@ -60,9 +42,10 @@ def main():
 
     with PiCameraFrameSource(size=(2304, 1296), fps=30) as camera:
     # with WebcamCameraSource(camera_index=0) as camera:
-        cameraMatrix, distCoeffs = load_camera_params()
+        cameraMatrix = camera.get_camera_matrix()
+        distCoeffs = camera.get_dist_coeffs()
 
-        vision_target = AprilVisionTarget(tag_size=0.055, camera_matrix=cameraMatrix, dist_coeffs=distCoeffs)
+        vision_target = AprilVisionTarget(camera_matrix=cameraMatrix, dist_coeffs=distCoeffs)
         # vision_target = IRVisionTarget(camera_matrix=cameraMatrix, dist_coeffs=distCoeffs)
         pose_estimator = PoseEstimator(cameraMatrix, distCoeffs, vision_target)
         inside_out_estimator = InsideOutEstimator(cameraMatrix, distCoeffs, vision_target)
