@@ -10,6 +10,10 @@ from picamera2 import Picamera2
 
 TAG_OFFSETS_FILENAME = "tag_offsets.json"
 
+# Body frame is 10 cm behind the camera (camera Z forward). In camera frame, body origin is at (0, 0, -0.10).
+# So tag position in body frame = tag position in camera frame + (0, 0, 0.10).
+CAMERA_TO_BODY_OFFSET_M = np.array([0.0, 0.0, 0.10], dtype=np.float64)
+
 class TagConfig:
     def __init__(self, tag_size: float, tag_id: int, position: Tuple[float, float, float], orientation: Tuple[float, float, float]):
         self.tag_size = tag_size
@@ -149,11 +153,18 @@ class AprilVisionTarget():
             return None
         return (rvec, tvec)
 
+    def _camera_to_body_frame(self, tvec_cam: np.ndarray, rvec_cam: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """Convert tag pose from camera frame to body frame (body 10 cm behind camera). Rotation unchanged."""
+        t = np.asarray(tvec_cam, dtype=np.float64).reshape(3) + CAMERA_TO_BODY_OFFSET_M
+        r = np.asarray(rvec_cam, dtype=np.float64).reshape(3, 1)
+        return (t.reshape(3, 1), r)
+
     def get_position(self, frame_bgr: np.ndarray) -> Optional[Dict[str, Any]]:
         """
-        Return tvec and rvec from camera frame to tag id 11.
-        When both tag 11 and 123 are visible, updates and prints the stored offset
-        so that when only tag 123 is visible, camera→tag11 can still be computed.
+        Return tvec and rvec for tag id 11 in body frame.
+        Body frame is 10 cm behind the camera (same orientation). When both tag 11 and 123
+        are visible, the stored offset is updated; when only 123 is visible, camera→tag11
+        is inferred from that offset, then converted to body frame.
         """
         detections = self.detect(frame_bgr)
         found = {d.tag_id: d for d in detections}
@@ -178,14 +189,15 @@ class AprilVisionTarget():
                     self._t_123_in_11 = t_new
                     if not self._offsets_path.exists() or self._offset_differs_more_than_10_percent(t_new, R_new):
                         self._save_offsets()
-                    else:
-                        print(
-                            "Offset 11→123 (in-memory) — position (m):",
-                            self._t_123_in_11.tolist(),
-                        )
+                    # else:
+                    #     print(
+                    #         "Offset 11→123 (in-memory) — position (m):",
+                    #         self._t_123_in_11.tolist(),
+                    #     )
+            tvec_body, rvec_body = self._camera_to_body_frame(tvec1, rvec1)
             return {
-                "rvec": rvec1,
-                "tvec": tvec1,
+                "rvec": rvec_body,
+                "tvec": tvec_body,
                 "detection": found[11],
             }
 
@@ -201,9 +213,10 @@ class AprilVisionTarget():
             t1 = t2 - R2 @ (self._R_123_in_11.T @ self._t_123_in_11)
             rvec1, _ = cv2.Rodrigues(R1)
             tvec1 = t1.reshape(3, 1)
+            tvec_body, rvec_body = self._camera_to_body_frame(tvec1, rvec1)
             return {
-                "rvec": rvec1,
-                "tvec": tvec1,
+                "rvec": rvec_body,
+                "tvec": tvec_body,
                 "detection": found[123],
             }
 
