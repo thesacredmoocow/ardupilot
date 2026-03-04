@@ -40,7 +40,8 @@ def main():
 
     print("Press 'q' to quit, 's' to save current frame")
 
-    with PiCameraFrameSource(size=(2304, 1296), fps=30) as camera:
+    # Default (1280, 720) for ~30 FPS; use size=(2304, 1296) only if calibration matches.
+    with PiCameraFrameSource(fps=30) as camera:
     # with WebcamCameraSource(camera_index=0) as camera:
         cameraMatrix = camera.get_camera_matrix()
         distCoeffs = camera.get_dist_coeffs()

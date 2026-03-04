@@ -284,7 +284,7 @@ elif [ ${RELEASE_CODENAME} == 'buster' ]; then
     SITL_PKGS+=" libpython3-stdlib" # for argparse
 elif [ ${RELEASE_CODENAME} != 'mantic' ] &&
      [ ${RELEASE_CODENAME} != 'noble' ]; then
-  SITL_PKGS+=" python-argparse"
+  SITL_PKGS+=""
 fi
 
 # Check for graphical package for MAVProxy
@@ -444,6 +444,8 @@ CCACHE_PATH=$(which ccache)
 if [[ $DO_AP_STM_ENV -eq 1 ]]; then
   install_arm_none_eabi_toolchain
 fi
+
+export PATH=/opt/gcc-arm-none-eabi-10-2020-q4-major/bin:/home/raspi/ardupilot/Tools/autotest:/usr/lib/ccache:$PATH
 
 heading "Adding ArduPilot Tools to environment"
 

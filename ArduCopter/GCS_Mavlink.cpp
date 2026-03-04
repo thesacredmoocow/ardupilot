@@ -1283,6 +1283,37 @@ void GCS_MAVLINK_Copter::handle_message_set_position_target_local_ned(const mavl
         mavlink_set_position_target_local_ned_t packet;
         mavlink_msg_set_position_target_local_ned_decode(&msg, &packet);
 
+#if AC_PRECLAND_ENABLED && MODE_LOITER_ENABLED
+        // In Loiter, when precision loiter is active and pilot is neutral, allow SET_POSITION_TARGET to control yaw and altitude only
+        if (copter.flightmode->mode_number() == Mode::Number::LOITER) {
+            const bool pos_ignore = packet.type_mask & MAVLINK_SET_POS_TYPE_MASK_POS_IGNORE;
+            const bool yaw_ignore = packet.type_mask & MAVLINK_SET_POS_TYPE_MASK_YAW_IGNORE;
+            if (!pos_ignore && !yaw_ignore &&
+                (packet.coordinate_frame == MAV_FRAME_LOCAL_NED ||
+                 packet.coordinate_frame == MAV_FRAME_LOCAL_OFFSET_NED ||
+                 packet.coordinate_frame == MAV_FRAME_BODY_NED ||
+                 packet.coordinate_frame == MAV_FRAME_BODY_OFFSET_NED)) {
+                // Z: NED to NEU cm (same as guided path)
+                Vector3f pos_vector(packet.x * 100.0f, packet.y * 100.0f, -packet.z * 100.0f);
+                if (packet.coordinate_frame == MAV_FRAME_BODY_NED || packet.coordinate_frame == MAV_FRAME_BODY_OFFSET_NED) {
+                    copter.rotate_body_frame_to_NE(pos_vector.x, pos_vector.y);
+                }
+                if (packet.coordinate_frame == MAV_FRAME_LOCAL_OFFSET_NED ||
+                    packet.coordinate_frame == MAV_FRAME_BODY_NED ||
+                    packet.coordinate_frame == MAV_FRAME_BODY_OFFSET_NED) {
+                    pos_vector += copter.inertial_nav.get_position_neu_cm();
+                }
+                const float z_cm_neu = pos_vector.z;
+                float yaw_cd = ToDeg(packet.yaw) * 100.0f;
+                if (packet.coordinate_frame == MAV_FRAME_BODY_NED || packet.coordinate_frame == MAV_FRAME_BODY_OFFSET_NED) {
+                    yaw_cd = wrap_360_cd(copter.ahrs.yaw_sensor + (int32_t)yaw_cd);
+                }
+                copter.mode_loiter.set_position_target_yaw_z_from_mavlink(yaw_cd, z_cm_neu);
+            }
+            return;
+        }
+#endif
+
         // exit if vehicle is not in Guided mode or Auto-Guided mode
         if (!copter.flightmode->in_guided_mode()) {
             return;

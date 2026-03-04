@@ -11,9 +11,9 @@ import cv2
 import pickle
 import glob
 
-IMAGE_PATH = "/home/raspi/ardupilot/GroundStation/Camera/PiCamera/Calibration/"
-JSON_PATH = "/home/raspi/ardupilot/GroundStation/Camera/PiCamera/Calibration/camera_params.json"
-PKL_PATH = "/home/raspi/ardupilot/GroundStation/Camera/PiCamera/Calibration/calibration.pckl"
+IMAGE_PATH = "/home/raspi/ardupilot/GroundStation/Camera/PiCameraW/Calibration/"
+JSON_PATH = "/home/raspi/ardupilot/GroundStation/Camera/PiCameraW/Calibration/camera_params.json"
+PKL_PATH = "/home/raspi/ardupilot/GroundStation/Camera/PiCameraW/Calibration/calibration.pckl"
 
 # Create arrays you'll use to store object points and image points from all images processed
 objpoints = [] # 3D point in real world space where chess squares are
@@ -73,8 +73,8 @@ for iname in images:
         # that the board was properly detected
         img = cv2.drawChessboardCorners(img, (CHESSBOARD_CORNERS_ROWCOUNT, CHESSBOARD_CORNERS_COLCOUNT), corners_acc, board)
         # Pause to display each image, waiting for key press
-        cv2.imshow('Chessboard', img)
-        cv2.waitKey(0)
+        # cv2.imshow('Chessboard', img)
+        # cv2.waitKey(0)
     else:
         print("Not able to detect a chessboard in image: {}".format(iname))
 

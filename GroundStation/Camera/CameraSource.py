@@ -120,23 +120,29 @@ class CameraSource(ABC):
             np.ndarray or None: The latest frame in BGR format if available, None otherwise
         """
         with self._lock:
-            if self._current_frame is not None:
-                self._new_frame_available = False
-                return self._current_frame.copy()
-            return None
-            
+            if self._current_frame is None:
+                return None
+            self._new_frame_available = False
+            frame_ref = self._current_frame
+        # Copy outside the lock so the capture thread is not blocked during the copy.
+        # Holding the lock during .copy() was limiting FPS to ~1/(copy_time) (~11 FPS).
+        return frame_ref.copy()
+
     def get_frame_with_timestamp(self) -> Tuple[Optional[np.ndarray], float]:
         """
         Get the latest frame along with its timestamp.
-        
+
         Returns:
             Tuple[np.ndarray or None, float]: (BGR frame, timestamp) or (None, 0) if no frame
         """
         with self._lock:
-            if self._current_frame is not None:
-                self._new_frame_available = False
-                return self._current_frame.copy(), self._frame_timestamp
-            return None, 0
+            if self._current_frame is None:
+                return None, 0
+            self._new_frame_available = False
+            frame_ref = self._current_frame
+            timestamp = self._frame_timestamp
+        # Copy outside the lock so the capture thread is not blocked during the copy.
+        return frame_ref.copy(), timestamp
             
     def is_capturing(self) -> bool:
         """
@@ -210,7 +216,7 @@ class CameraSource(ABC):
                 last_capture_time = current_time
             else:
                 # If capture failed, wait a bit before retrying
-                time.sleep(0.01)
+                time.sleep(0.001)
                 print("Waiting for frame")
     
     @abstractmethod

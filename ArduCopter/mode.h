@@ -1295,6 +1295,8 @@ public:
 
 #if AC_PRECLAND_ENABLED
     void set_precision_loiter_enabled(bool value) { _precision_loiter_enabled = value; }
+    /// Store yaw (cd) and altitude (cm, NEU) from SET_POSITION_TARGET_LOCAL_NED for use when precision loiter + pilot neutral
+    void set_position_target_yaw_z_from_mavlink(float yaw_cd, float z_cm_neu);
 #endif
 
 protected:
@@ -1316,6 +1318,11 @@ private:
 #if AC_PRECLAND_ENABLED
     bool _precision_loiter_enabled;
     bool _precision_loiter_active; // true if user has switched on prec loiter
+    /// MAVLink SET_POSITION_TARGET yaw (cd) and z (cm NEU); used only when precision loiter active and pilot neutral
+    float _external_yaw_cd;
+    float _external_z_cm;
+    uint32_t _external_target_ms;
+    static constexpr uint32_t _external_target_timeout_ms = 500;
 #endif
 
 };

@@ -16,7 +16,7 @@ class PiCameraFrameSource(CameraSource):
     """
 
     def __init__(self, size: Tuple[int, int] = (2304, 1296), fps: int = 30):
-        super().__init__(json_path="/home/raspi/ardupilot/GroundStation/Camera/PiCamera/Calibration/camera_params.json")
+        super().__init__(json_path="/home/raspi/ardupilot/GroundStation/Camera/PiCameraW/Calibration/camera_params.json")
         self.size = size
         self.fps = fps
 
@@ -25,11 +25,12 @@ class PiCameraFrameSource(CameraSource):
         try:
             self._camera = Picamera2()
             config = self._camera.create_video_configuration(
-                main={"size": self.size, "format": "RGB888"},
+                main={"size": self.size},#, "format": "RGB888"},
                 controls={
                     "FrameRate": self.fps,
-                    "AfMode": controls.AfModeEnum.Continuous
+                    # "AfMode": controls.AfModeEnum.Continuous
                 },
+                buffer_count=4,
             )
             self._camera.configure(config)
             self._camera.start()
@@ -49,7 +50,9 @@ class PiCameraFrameSource(CameraSource):
 
         try:
             rgb = self._camera.capture_array()
-            return cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+            # ret = cv2.resize(rgb, (640, 480))
+            ret = cv2.cvtColor(ret, cv2.COLOR_RGB2GRAY)
+            return ret
         except Exception:
             return None
 

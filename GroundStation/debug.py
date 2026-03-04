@@ -5,62 +5,61 @@ Demonstrates real-time camera display and drawing of tag id 11 position (camera 
 
 import cv2
 import numpy as np
+from picamera2 import Picamera2
 from Camera.PiCameraFrameSource import PiCameraFrameSource
 from VisionTarget.AprilVisionTarget import AprilVisionTarget
 
 # Axis length in metres for drawing tag 11 pose
 AXIS_LENGTH_M = 0.06
 
+
+def print_camera_sensor_modes():
+    """Print available sensor modes for the Pi camera."""
+    cam = Picamera2()
+    modes = cam.sensor_modes
+    print(f"Available sensor modes ({len(modes)}):")
+    for i, m in enumerate(modes):
+        print(f"  [{i}] {m}")
+
+
 def main():
-    print("Press 'q' to quit. Tag 11 position (rvec/tvec) is drawn when visible.")
+    # print_camera_sensor_modes()
+    print("\nPress 'q' to quit. Tag 11 position (rvec/tvec) is drawn when visible.")
 
-    with PiCameraFrameSource(size=(2304, 1296), fps=30) as camera:
-        cameraMatrix = camera.get_camera_matrix()
-        distCoeffs = camera.get_dist_coeffs()
-        if cameraMatrix is None or distCoeffs is None:
-            print("No camera params; cannot run AprilTag pose.")
-            return
-        vision_target = AprilVisionTarget(camera_matrix=cameraMatrix, dist_coeffs=distCoeffs)
+    # with PiCameraFrameSource(size=(1536, 864), fps=120) as camera:
+    SIZE = (1536, 864)
+    FPS = 120
 
-        while True:
-            if camera.is_new_frame_available():
-                frame = camera.get_latest_frame()
-                if frame is None:
-                    continue
-                display = frame.copy()
+    print(f"Opening camera at {SIZE[0]}x{SIZE[1]}, {FPS} FPS...")
+    picam2 = Picamera2()
+    config = picam2.create_video_configuration(
+        main={"size": SIZE},
+        controls={"FrameRate": FPS},
+        buffer_count=4,
+    )
+    picam2.configure(config)
+    picam2.start()
 
-                result = vision_target.get_position(frame)
-                if result is not None:
-                    rvec = result["rvec"]
-                    tvec = result["tvec"]
-                    det = result["detection"]
-                    # Draw 3D axes at tag 11 position (camera → tag 11)
-                    cv2.drawFrameAxes(
-                        display,
-                        np.array(cameraMatrix, dtype=np.float32),
-                        np.array(distCoeffs, dtype=np.float32),
-                        rvec,
-                        tvec,
-                        AXIS_LENGTH_M,
-                        2,
-                    )
-                    # Draw detection outline (tag 11 or tag 123 if inferred)
-                    corners = np.array(det.corners, dtype=np.int32)
-                    cv2.polylines(display, [corners.reshape(-1, 1, 2)], True, (0, 255, 0), 2)
-                    center = tuple(np.array(det.center, dtype=np.int32))
-                    cv2.putText(
-                        display,
-                        f"tag {det.tag_id} (→11)",
-                        (center[0] - 40, center[1] - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        0.6,
-                        (0, 255, 0),
-                        2,
-                    )
+    while True:
+        # if camera.is_new_frame_available():
+            # frame = camera.get_latest_frame()
+        frame = picam2.capture_array()
+        if frame is None:
+            continue
+        # FPS calculation
+        # FPS calculation
+        import time
+        if not hasattr(main, "_last_time"):
+            main._last_time = time.time()
+            main._frame_count = 0
 
-                cv2.imshow("Frame", cv2.resize(display, (960, 540)))
-                if cv2.waitKey(1) & 0xFF == ord("q"):
-                    break
+        main._frame_count += 1
+        now = time.time()
+        if now - main._last_time >= 1.0:
+            fps = main._frame_count / (now - main._last_time)
+            print(f"FPS: {fps:.2f}")
+            main._last_time = now
+            main._frame_count = 0
 
     cv2.destroyAllWindows()
 

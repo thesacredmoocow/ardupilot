@@ -1,5 +1,6 @@
 # from VisionTarget.VisionTarget import VisionTarget
-from pupil_apriltags import Detector
+# from pupil_apriltags import Detector
+from dt_apriltags import Detector
 from typing import Optional, Dict, Any, Tuple
 import numpy as np
 import cv2
@@ -66,18 +67,29 @@ class AprilVisionTarget():
         camera_matrix: np.ndarray,
         dist_coeffs: np.ndarray,
         offsets_path: Optional[Path] = "/home/raspi/ardupilot/GroundStation/VisionTarget/tag_offsets.json",
+        timing_print_interval: int = 0,
     ):
         self.tag_configs = [
             TagConfig(tag_size=0.128, tag_id=11, position=(0, 0, 0), orientation=(0, 0, 0)),
             TagConfig(tag_size=0.055, tag_id=123, position=(0, 0, 0), orientation=(0, 0, 0)),
         ]
-        self.detector = Detector()
+        self.detector = Detector(#searchpath=['apriltags'],
+                                families='tag36h11',
+                                nthreads=4,
+                                quad_decimate=4.0,
+                                quad_sigma=0.8,
+                                refine_edges=1,
+                                decode_sharpening=0.25,
+                                debug=0)
         self.camera_matrix = np.array(camera_matrix, dtype=np.float32)
         self.dist_coeffs = np.array(dist_coeffs, dtype=np.float32)
         self._t_123_in_11 = None
         self._R_123_in_11 = None
         self._offsets_path = Path(offsets_path) if offsets_path is not None else Path(__file__).resolve().parent / TAG_OFFSETS_FILENAME
         self._load_offsets()
+        # Timing: print every N calls (0 = disabled).
+        self._timing_print_interval = int(timing_print_interval)
+        self._get_position_call_count = 0
 
     def _load_offsets(self) -> None:
         """Load tag 11→123 offset from JSON if the file exists."""
@@ -139,19 +151,54 @@ class AprilVisionTarget():
         frame_gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
         return self.detector.detect(frame_gray)
 
+    # Minimum depth (m) in camera frame to accept a solution; rejects "flipped" (back-of-tag) pose.
+    MIN_TAG_DEPTH_M = 0.01
+
     def _solve_tag_pose(self, tag_id: int, corners: np.ndarray) -> Optional[Tuple[np.ndarray, np.ndarray]]:
-        """Return (rvec, tvec) for tag in camera frame, or None."""
+        """
+        Return (rvec, tvec) for tag in camera frame using solvePnPGeneric with SOLVEPNP_IPPE_SQUARE.
+        Picks the solution with tag in front of camera (positive Z); returns None if none valid.
+        """
         cfg = get_tag_config(tag_id, self.tag_configs)
         if cfg is None:
             return None
         img_pts = np.array(corners, dtype=np.float32)
+        # result = cv2.solvePnPGeneric(
+        #     cfg.obj_points,
+        #     img_pts,
+        #     self.camera_matrix,
+        #     self.dist_coeffs,
+        #     flags=cv2.SOLVEPNP_IPPE_SQUARE,
+        # )
+        # ok = result[0]
+        # rvecs = result[1]
+        # tvecs = result[2]
+        # Use OpenCV's standard solvePnP (use SOLVEPNP_ITERATIVE) to estimate pose
         ok, rvec, tvec = cv2.solvePnP(
-            cfg.obj_points, img_pts,
-            self.camera_matrix, self.dist_coeffs,
+            cfg.obj_points,
+            img_pts,
+            self.camera_matrix,
+            self.dist_coeffs,
+            flags=cv2.SOLVEPNP_ITERATIVE,
         )
-        if not ok:
+        rvecs = [rvec] if ok else []
+        tvecs = [tvec] if ok else []
+        if not ok or not rvecs or not tvecs:
             return None
-        return (rvec, tvec)
+        # Choose solution with tag in front of camera (largest positive depth).
+        best_rvec: Optional[np.ndarray] = None
+        best_tvec: Optional[np.ndarray] = None
+        best_depth = self.MIN_TAG_DEPTH_M
+        for rvec, tvec in zip(rvecs, tvecs):
+            t = tvec.reshape(3)
+            depth = float(t[2])
+            if depth >= self.MIN_TAG_DEPTH_M and depth > best_depth:
+                best_depth = depth
+                best_rvec = rvec
+                best_tvec = tvec
+        if best_rvec is None or best_tvec is None:
+            return None
+        return (best_rvec, best_tvec)
 
     def _camera_to_body_frame(self, tvec_cam: np.ndarray, rvec_cam: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """Convert tag pose from camera frame to body frame (body 10 cm behind camera). Rotation unchanged."""
@@ -166,19 +213,41 @@ class AprilVisionTarget():
         are visible, the stored offset is updated; when only 123 is visible, camera→tag11
         is inferred from that offset, then converted to body frame.
         """
-        detections = self.detect(frame_bgr)
+        t_total = time.perf_counter()
+        ms_bgr2gray = 0.0
+        ms_detector_detect = 0.0
+        ms_solve_11 = 0.0
+        ms_solve_123 = 0.0
+        ms_offset_update = 0.0
+        ms_infer_from_123 = 0.0
+        ms_camera_to_body = 0.0
+
+        t0 = time.perf_counter()
+        frame_gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
+        ms_bgr2gray = (time.perf_counter() - t0) * 1000
+        t0 = time.perf_counter()
+        detections = self.detector.detect(frame_gray)
+        ms_detector_detect = (time.perf_counter() - t0) * 1000
+
         found = {d.tag_id: d for d in detections}
         has_11 = 11 in found
         has_123 = 123 in found
 
         # Case 1: Tag 11 visible → use it directly and optionally update offset from 123
         if has_11:
+            t0 = time.perf_counter()
             rvec1, tvec1 = self._solve_tag_pose(11, found[11].corners)
+            ms_solve_11 = (time.perf_counter() - t0) * 1000
             if rvec1 is None:
+                ms_total = (time.perf_counter() - t_total) * 1000
+                self._maybe_print_timing(ms_bgr2gray, ms_detector_detect, ms_solve_11, ms_solve_123, ms_offset_update, ms_infer_from_123, ms_camera_to_body, ms_total)
                 return None
             if has_123:
+                t0 = time.perf_counter()
                 rvec2, tvec2 = self._solve_tag_pose(123, found[123].corners)
+                ms_solve_123 = (time.perf_counter() - t0) * 1000
                 if rvec2 is not None:
+                    t0 = time.perf_counter()
                     R1, _ = cv2.Rodrigues(rvec1)
                     R2, _ = cv2.Rodrigues(rvec2)
                     t1 = tvec1.reshape(3)
@@ -189,12 +258,12 @@ class AprilVisionTarget():
                     self._t_123_in_11 = t_new
                     if not self._offsets_path.exists() or self._offset_differs_more_than_10_percent(t_new, R_new):
                         self._save_offsets()
-                    # else:
-                    #     print(
-                    #         "Offset 11→123 (in-memory) — position (m):",
-                    #         self._t_123_in_11.tolist(),
-                    #     )
+                    ms_offset_update = (time.perf_counter() - t0) * 1000
+            t0 = time.perf_counter()
             tvec_body, rvec_body = self._camera_to_body_frame(tvec1, rvec1)
+            ms_camera_to_body = (time.perf_counter() - t0) * 1000
+            ms_total = (time.perf_counter() - t_total) * 1000
+            self._maybe_print_timing(ms_bgr2gray, ms_detector_detect, ms_solve_11, ms_solve_123, ms_offset_update, ms_infer_from_123, ms_camera_to_body, ms_total)
             return {
                 "rvec": rvec_body,
                 "tvec": tvec_body,
@@ -203,24 +272,65 @@ class AprilVisionTarget():
 
         # Case 2: Only tag 123 visible → use stored offset to get camera→tag11
         if has_123 and self._R_123_in_11 is not None and self._t_123_in_11 is not None:
+            t0 = time.perf_counter()
             rvec2, tvec2 = self._solve_tag_pose(123, found[123].corners)
+            ms_solve_123 = (time.perf_counter() - t0) * 1000
             if rvec2 is None:
+                ms_total = (time.perf_counter() - t_total) * 1000
+                self._maybe_print_timing(ms_bgr2gray, ms_detector_detect, ms_solve_11, ms_solve_123, ms_offset_update, ms_infer_from_123, ms_camera_to_body, ms_total)
                 return None
+            t0 = time.perf_counter()
             R2, _ = cv2.Rodrigues(rvec2)
             t2 = tvec2.reshape(3)
-            # Camera→tag11: R1 = R2 @ R_123_in_11.T, t1 = t2 - R2 @ (R_123_in_11.T @ t_123_in_11)
             R1 = R2 @ self._R_123_in_11.T
             t1 = t2 - R2 @ (self._R_123_in_11.T @ self._t_123_in_11)
+            if t1[2] < self.MIN_TAG_DEPTH_M:
+                ms_infer_from_123 = (time.perf_counter() - t0) * 1000
+                ms_total = (time.perf_counter() - t_total) * 1000
+                self._maybe_print_timing(ms_bgr2gray, ms_detector_detect, ms_solve_11, ms_solve_123, ms_offset_update, ms_infer_from_123, ms_camera_to_body, ms_total)
+                return None
             rvec1, _ = cv2.Rodrigues(R1)
             tvec1 = t1.reshape(3, 1)
+            ms_infer_from_123 = (time.perf_counter() - t0) * 1000
+            t0 = time.perf_counter()
             tvec_body, rvec_body = self._camera_to_body_frame(tvec1, rvec1)
+            ms_camera_to_body = (time.perf_counter() - t0) * 1000
+            ms_total = (time.perf_counter() - t_total) * 1000
+            self._maybe_print_timing(ms_bgr2gray, ms_detector_detect, ms_solve_11, ms_solve_123, ms_offset_update, ms_infer_from_123, ms_camera_to_body, ms_total)
             return {
                 "rvec": rvec_body,
                 "tvec": tvec_body,
                 "detection": found[123],
             }
 
+        ms_total = (time.perf_counter() - t_total) * 1000
+        self._maybe_print_timing(ms_bgr2gray, ms_detector_detect, ms_solve_11, ms_solve_123, ms_offset_update, ms_infer_from_123, ms_camera_to_body, ms_total)
         return None
+
+    def _maybe_print_timing(
+        self,
+        ms_bgr2gray: float,
+        ms_detector_detect: float,
+        ms_solve_11: float,
+        ms_solve_123: float,
+        ms_offset_update: float,
+        ms_infer_from_123: float,
+        ms_camera_to_body: float,
+        ms_total: float,
+    ) -> None:
+        """Print get_position timing every _timing_print_interval calls."""
+        self._get_position_call_count += 1
+        if self._timing_print_interval <= 0:
+            return
+        if self._get_position_call_count % self._timing_print_interval != 0:
+            return
+        ms_detect = ms_bgr2gray + ms_detector_detect
+        print(
+            f"[AprilVisionTarget.get_position ms] bgr2gray={ms_bgr2gray:.2f} detector_detect={ms_detector_detect:.2f} "
+            f"(detect_total={ms_detect:.2f}) solve_11={ms_solve_11:.2f} solve_123={ms_solve_123:.2f} "
+            f"offset_update={ms_offset_update:.2f} infer_from_123={ms_infer_from_123:.2f} "
+            f"camera_to_body={ms_camera_to_body:.2f} total={ms_total:.2f}"
+        )
 
 # def main():
 #     with PiCameraFrameSource(size=(2304, 1296), fps=30) as cam:

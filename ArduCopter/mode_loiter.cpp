@@ -36,10 +36,20 @@ bool ModeLoiter::init(bool ignore_checks)
 
 #if AC_PRECLAND_ENABLED
     _precision_loiter_active = false;
+    _external_target_ms = 0;
 #endif
 
     return true;
 }
+
+#if AC_PRECLAND_ENABLED
+void ModeLoiter::set_position_target_yaw_z_from_mavlink(float yaw_cd, float z_cm_neu)
+{
+    _external_yaw_cd = yaw_cd;
+    _external_z_cm = z_cm_neu;
+    _external_target_ms = AP_HAL::millis();
+}
+#endif
 
 #if AC_PRECLAND_ENABLED
 bool ModeLoiter::do_precision_loiter()
@@ -185,9 +195,6 @@ void ModeLoiter::run()
         loiter_nav->update();
 #endif
 
-        // call attitude controller
-        attitude_control->input_thrust_vector_rate_heading(loiter_nav->get_thrust_vector(), target_yaw_rate, false);
-
         // get avoidance adjusted climb rate
         target_climb_rate = get_avoidance_adjusted_climbrate(target_climb_rate);
 
@@ -196,8 +203,30 @@ void ModeLoiter::run()
         copter.surface_tracking.update_surface_offset();
 #endif
 
+#if AC_PRECLAND_ENABLED
+        // When precision loiter is active and pilot input is neutral, allow SET_POSITION_TARGET_LOCAL_NED to control yaw and altitude only
+        bool use_external_yaw_z = false;
+        if (_precision_loiter_active &&
+            (AP_HAL::millis() - _external_target_ms) < _external_target_timeout_ms &&
+            fabsf(target_climb_rate) < 2.0f &&
+            fabsf(target_yaw_rate) < 2.0f) {
+            use_external_yaw_z = true;
+        }
+        if (use_external_yaw_z) {
+            pos_control->set_pos_desired_z_cm(_external_z_cm);
+            // Use same angle-to-rate gain as guided mode (ANG_YAW_P, default 4.5): rate_cds = kP * error_cd
+            const float yaw_error_cd = wrap_180_cd(_external_yaw_cd - ahrs.yaw_sensor);
+            target_yaw_rate = yaw_error_cd * attitude_control->get_angle_yaw_p().kP();
+        } else {
+            pos_control->set_pos_target_z_from_climb_rate_cm(target_climb_rate);
+        }
+#else
         // Send the commanded climb rate to the position controller
         pos_control->set_pos_target_z_from_climb_rate_cm(target_climb_rate);
+#endif
+
+        // call attitude controller (uses target_yaw_rate, possibly overridden by MAVLink when precision loiter + neutral)
+        attitude_control->input_thrust_vector_rate_heading(loiter_nav->get_thrust_vector(), target_yaw_rate, false);
         break;
     }
 
