@@ -349,9 +349,7 @@ class MavlinkPublisher:
         if self._connection is None:
                 return False
         try:
-            usec = int(time.time() * 1e6)
             x, y, z = self._to_xyz(tvec)
-            distance = float(np.sqrt(x * x + y * y + z * z))
             target_system, target_component = self._get_target_ids()
             # Use position + yaw, ignore velocity/accel/yaw_rate.
             type_mask = (
@@ -385,11 +383,11 @@ class MavlinkPublisher:
                 yaw = yaw,
                 yaw_rate = 0,
             )
-            print(
-                f"Published position target to {target_system}.{target_component}: "
-                f"forward={z}, right={x}, down={y}, yaw={yaw}, {type(yaw)}, timestamp={timestamp}"
-            )
-            # print(yaw)
+            # print(
+            #     f"Published position target to {target_system}.{target_component}: "
+            #     f"forward={z}, right={x}, down={y}, yaw={yaw}, {type(yaw)}, timestamp={timestamp}"
+            # )
+            print(y)
             
             return True
         except Exception as e:
@@ -401,6 +399,7 @@ class MavlinkPublisher:
         self,
         tvec: Union[np.ndarray, tuple, list],
         use_angles: bool = False,
+        timestamp: int = None,
     ) -> bool:
         """
         Publish a LANDING_TARGET message with the target position in body FRD frame.
@@ -416,7 +415,6 @@ class MavlinkPublisher:
         if self._connection is None:
             return False
         try:
-            usec = int(time.time() * 1e6)
             x, y, z = self._to_xyz(tvec)
             distance = float(np.sqrt(x * x + y * y + z * z))
             if use_angles:
@@ -427,7 +425,7 @@ class MavlinkPublisher:
                     angle_x = float(np.arctan2(x, y))
                     angle_y = float(np.arctan2(z, y))
                 self._connection.mav.landing_target_send(
-                    time_usec=usec,
+                    time_usec=timestamp*1000,
                     target_num=0,
                     frame=mavutil.mavlink.MAV_FRAME_BODY_FRD,
                     angle_x=angle_x,

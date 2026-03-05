@@ -96,6 +96,7 @@ void ModeLoiter::run()
     float target_roll, target_pitch;
     float target_yaw_rate = 0.0f;
     float target_climb_rate = 0.0f;
+    const float yaw_rate_max_cds = attitude_control->get_slew_yaw_max_degs() * 100.0f;
 
     // set vertical speed and acceleration limits
     pos_control->set_max_speed_accel_z(-get_pilot_speed_dn(), g.pilot_speed_up, g.pilot_accel_z);
@@ -214,9 +215,11 @@ void ModeLoiter::run()
         }
         if (use_external_yaw_z) {
             pos_control->set_pos_desired_z_cm(_external_z_cm);
+            // GCS_MAVLINK::send_text(MAV_SEVERITY_INFO, "Precision loiter active");
             // Use same angle-to-rate gain as guided mode (ANG_YAW_P, default 4.5): rate_cds = kP * error_cd
             const float yaw_error_cd = wrap_180_cd(_external_yaw_cd - ahrs.yaw_sensor);
             target_yaw_rate = yaw_error_cd * attitude_control->get_angle_yaw_p().kP();
+            target_yaw_rate = constrain_float(target_yaw_rate, -yaw_rate_max_cds, yaw_rate_max_cds);
         } else {
             pos_control->set_pos_target_z_from_climb_rate_cm(target_climb_rate);
         }
