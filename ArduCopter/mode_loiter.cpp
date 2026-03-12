@@ -214,7 +214,8 @@ void ModeLoiter::run()
             use_external_yaw_z = true;
         }
         if (use_external_yaw_z) {
-            pos_control->set_pos_desired_z_cm(_external_z_cm);
+            // pos_control->set_pos_desired_z_cm(_external_z_cm);
+            pos_control->set_pos_target_z_from_climb_rate_cm(_external_z_cm);
             // GCS_MAVLINK::send_text(MAV_SEVERITY_INFO, "Precision loiter active");
             // Use same angle-to-rate gain as guided mode (ANG_YAW_P, default 4.5): rate_cds = kP * error_cd
             const float yaw_error_cd = wrap_180_cd(_external_yaw_cd - ahrs.yaw_sensor);

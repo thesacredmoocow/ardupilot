@@ -557,6 +557,11 @@ private:
     // last valid RC input time
     uint32_t last_radio_update_ms;
 
+#if MODE_THROW_ENABLED
+    // time (ms) when NAMED_VALUE_INT with name "THROW" was last received; 0 if never
+    uint32_t last_throw_named_value_ms;
+#endif
+
     // last esc calibration notification update
     uint32_t esc_calibration_notify_update_ms;
 

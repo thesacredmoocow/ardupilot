@@ -72,7 +72,7 @@ void ModeThrow::run()
         // initialise the demanded height to 3m above the throw height
         // we want to rapidly clear surrounding obstacles
         if (g2.throw_type == ThrowType::Drop) {
-            pos_control->set_pos_desired_z_cm(inertial_nav.get_position_z_up_cm() - 100);
+            pos_control->set_pos_desired_z_cm(inertial_nav.get_position_z_up_cm() - 40);
         } else {
             pos_control->set_pos_desired_z_cm(inertial_nav.get_position_z_up_cm() + 300);
         }
@@ -157,11 +157,11 @@ void ModeThrow::run()
         // set motors to full range
         motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
 
-        // demand a level roll/pitch attitude with zero yaw rate
-        attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(0.0f, 0.0f, 0.0f);
+        // demand a level roll attitude and 5 degrees of pitch up (move backwards) with zero yaw rate
+        attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(0.0f, 5.0f, 0.0f);
 
         // output 50% throttle and turn off angle boost to maximise righting moment
-        attitude_control->set_throttle_out(0.5f, false, g.throttle_filt);
+        attitude_control->set_throttle_out(0.12f, false, g.throttle_filt);
 
         break;
 
@@ -170,8 +170,8 @@ void ModeThrow::run()
         // set motors to full range
         motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
 
-        // call attitude controller
-        attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(0.0f, 0.0f, 0.0f);
+        // call attitude controller with 5 degrees of pitch up (move backwards)
+        attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(0.0f, 5.0f, 0.0f);
 
         // call height controller
         pos_control->set_pos_target_z_from_climb_rate_cm(0.0f);
@@ -251,6 +251,18 @@ void ModeThrow::run()
 
 bool ModeThrow::throw_detected()
 {
+    // Return true if NAMED_VALUE_INT with name "THROW" was received in the last 100ms
+    if (copter.last_throw_named_value_ms != 0 &&
+        (AP_HAL::millis() - copter.last_throw_named_value_ms) <= 100) {
+        return true;
+    }
+
+    // Return true if RC option 47 (USER_FUNC1) is high
+    const RC_Channel *chan_opt47 = rc().find_channel_for_option(RC_Channel::AUX_FUNC::USER_FUNC1);
+    if (chan_opt47 != nullptr && chan_opt47->get_aux_switch_pos() == RC_Channel::AuxSwitchPos::HIGH) {
+        return true;
+    }
+
     // Check that we have a valid navigation solution
     nav_filter_status filt_status = inertial_nav.get_filter_status();
     if (!filt_status.flags.attitude || !filt_status.flags.horiz_pos_abs || !filt_status.flags.vert_pos) {

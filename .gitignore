@@ -70,6 +70,7 @@ ArduPlane/test.ArduPlane/
 ArduPlane/test/*
 ArduPlane/way.txt
 Build.Rover/*
+GroundStation/SLAM/calibration_data/
 Build.AntennaTracker/*
 Build.ArduCopter/*
 Build.ArduPlane/*

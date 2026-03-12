@@ -90,6 +90,99 @@ def draw_in_tag_frame(
         cv2.line(frame, origin_px, pt_px, color, thickness)
 
 
+def tag_point_in_tag_to_body(
+    tvec_tag_in_body: np.ndarray,
+    rvec_tag_in_body: np.ndarray,
+    point_in_tag: np.ndarray,
+) -> np.ndarray:
+    """
+    Convert a point expressed in the tag frame to body frame, from first principles.
+
+    tvec_tag_in_body: position of the tag origin in body frame (3,) or (3,1).
+    rvec_tag_in_body: rotation vector of tag in body frame (Rodrigues, OpenCV).
+    point_in_tag:     point coordinates in tag frame (3,) or (3,1).
+
+    Returns:
+        point_in_body: (3,) position of the point in body frame.
+    """
+    t = np.asarray(tvec_tag_in_body, dtype=np.float64).reshape(3)
+    rvec = np.asarray(rvec_tag_in_body, dtype=np.float64).reshape(3, 1)
+    p_tag = np.asarray(point_in_tag, dtype=np.float64).reshape(3)
+
+    R_tag_to_body, _ = cv2.Rodrigues(rvec)
+    p_body = R_tag_to_body @ p_tag + t
+    return p_body.reshape(3)
+
+
+def draw_body_offset_axes(
+    frame: np.ndarray,
+    camera_matrix: np.ndarray,
+    dist_coeffs: np.ndarray,
+    point_in_body: np.ndarray,
+    thickness: int = 2,
+) -> None:
+    """
+    Draw axes lines from the body origin to indicate offsets of a point in body frame.
+
+    Body frame: x right, y down, z forward (same orientation as camera, but translated).
+
+    We visualize the offset (dx, dy, dz) = point_in_body as a stepped path:
+      origin -> (dx, 0, 0)  [X component, red]
+              -> (dx, dy, 0)  [Y component, green]
+              -> (dx, dy, dz) [Z component, blue = full offset]
+    """
+    if frame is None or point_in_body is None:
+        return
+    p = np.asarray(point_in_body, dtype=np.float64).reshape(3)
+
+    # Object frame = body. In camera frame, body origin is at -CAMERA_TO_BODY_OFFSET_M.
+    rvec_body_to_cam = np.zeros((3, 1), dtype=np.float64)
+    tvec_body_to_cam = -CAMERA_TO_BODY_OFFSET_M.reshape(3, 1)
+
+    obj_pts = np.array(
+        [
+            [0.0, 0.0, 0.0],          # 0: body origin
+            [p[0], 0.0, 0.0],         # 1: x-only
+            [p[0], p[1], 0.0],        # 2: x + y
+            [p[0], p[1], p[2]],       # 3: x + y + z (full offset)
+        ],
+        dtype=np.float64,
+    )
+
+    img_pts, _ = cv2.projectPoints(
+        obj_pts,
+        rvec_body_to_cam,
+        tvec_body_to_cam,
+        camera_matrix,
+        dist_coeffs,
+    )
+    img_pts = np.squeeze(img_pts, axis=1)
+    if img_pts.ndim != 2 or img_pts.shape[0] < 4 or img_pts.shape[1] < 2:
+        return
+
+    h, w = frame.shape[:2]
+
+    def _to_px(p2):
+        x = int(round(float(p2[0])))
+        y = int(round(float(p2[1])))
+        return x, y
+
+    origin_px = _to_px(img_pts[0])
+    x_px = _to_px(img_pts[1])
+    xy_px = _to_px(img_pts[2])
+    xyz_px = _to_px(img_pts[3])
+
+    # Draw stepped axes that all meet at the final target point xyz_px.
+    segments = [
+        (origin_px, x_px, (0, 0, 255)),   # X: red
+        (x_px, xy_px, (0, 255, 0)),       # Y: green
+        (xy_px, xyz_px, (255, 0, 0)),     # Z: blue
+    ]
+    for p0, p1, col in segments:
+        if 0 <= p0[0] < w and 0 <= p0[1] < h and 0 <= p1[0] < w and 0 <= p1[1] < h:
+            cv2.line(frame, p0, p1, col, thickness)
+
+
 mavlink = MavlinkPublisher(
     format="udpin", 
     address="127.0.0.1", 
@@ -113,7 +206,7 @@ def main():
     distCoeffs = np.asarray(distCoeffs, dtype=np.float64).reshape(-1, 1)
     
     vision_target = AprilVisionTarget(camera_matrix=cameraMatrix, dist_coeffs=distCoeffs)
-    # docking_manager = DockingManager()
+    docking_manager = DockingManager()
 
     picam2 = setup_camera(size=(1536, 864), fps=120)
     # slam = Orbslam.Orbslam()
@@ -137,13 +230,15 @@ def main():
             det = result["detection"]
             # Odometry with tag frame as origin (MAVLink ODOMETRY)
             (x_tag, y_tag, z_tag), q_tag_to_body = body_pose_in_tag_frame(tvec, rvec)
+            # print(f"x_tag: {x_tag:.2f}, y_tag: {y_tag:.2f}, z_tag: {z_tag:.2f}")
 
             # target_point_in_tag = docking_manager.get_target_positition(np.array([x_tag, y_tag, z_tag]))
-            # DOCKED_POSITION = np.array([-0.448, -0.059, -0.183])
+            # DOCKED_POSITION = np.array([-0.04, -0.283, -0.548])
             # ALIGNMENT_ALT_OFFSET = 0.2
-            # ALIGNMENT_POSITION = np.array([DOCKED_POSITION[0], DOCKED_POSITION[1], DOCKED_POSITION[2] + ALIGNMENT_ALT_OFFSET])
+            # ALIGNMENT_POSITION = np.array([DOCKED_POSITION[0], DOCKED_POSITION[1] + ALIGNMENT_ALT_OFFSET, DOCKED_POSITION[2]])
             # target_point_in_tag =  ALIGNMENT_POSITION
-            target_point_in_tag = np.array([0.0, 0.0, -0.3])
+            target_point_in_tag = docking_manager.get_target_positition(np.array([x_tag, y_tag, z_tag]))
+            target_point_in_tag_on_ground = np.array([target_point_in_tag[0], target_point_in_tag[1] + 1.0, target_point_in_tag[2]])
             
             # rvec/tvec are tag-in-body; drawFrameAxes and draw_in_tag_frame need tag-in-camera.
             tvec_body = np.asarray(tvec, dtype=np.float64).reshape(3, 1)
@@ -162,74 +257,42 @@ def main():
                 thickness=5,
             )
 
-            time_usec = frame_time_ms * 1000
-            # mavlink.publish_odometry_tag_frame(
-            mavlink.publish_vision_position_estimate_tag_frame(
-                time_usec=time_usec,
-                x=x_tag,
-                y=y_tag,
-                z=z_tag,
-                q=q_tag_to_body,
-                estimator_type=mavutil.mavlink.MAV_ESTIMATOR_TYPE_VISION,
-                quality=100,
-            )
-            target_point = np.array([target_point_in_tag[1], target_point_in_tag[2], target_point_in_tag[0]])
-            target_point_in_body = tag_point_to_body(tvec, rvec, target_point)
-
-            yaw = math.atan2(tvec[0], tvec[2])
-            if DEBUG_VECTORS:
-                mavlink.publish_tvec_rvec("BDY_TAG", tvec, rvec)
-                mavlink.publish_target_point(target_point_in_body)
-
-            vertical_error = target_point_in_tag[2] - z_tag
-            target_vertical_speed = -vertical_error * 50
-
-            
-            R_tag_to_body, _ = cv2.Rodrigues(rvec)
-            # Get RPY from rotation matrix (R_tag_to_body: tag->body)
-            # Since we want "body in tag frame", invert R
-            R_body_in_tag = R_tag_to_body.T
-            sy = math.sqrt(R_body_in_tag[0, 0] * R_body_in_tag[0, 0] + R_body_in_tag[1, 0] * R_body_in_tag[1, 0])
-            singular = sy < 1e-6
-            if not singular:
-                roll = math.atan2(R_body_in_tag[2, 1], R_body_in_tag[2, 2])
-                pitch = math.atan2(-R_body_in_tag[2, 0], sy)
-                yaw = math.atan2(R_body_in_tag[1, 0], R_body_in_tag[0, 0])
-            else:
-                roll = math.atan2(-R_body_in_tag[1, 2], R_body_in_tag[1, 1])
-                pitch = math.atan2(-R_body_in_tag[2, 0], sy)
-                yaw = 0
-            # print(f"Rel RPY (deg): roll={math.degrees(roll):.1f} pitch={math.degrees(pitch):.1f} yaw={math.degrees(yaw):.1f}")
-
-            # Display body-frame offsets to target_point_in_tag
-            right_m = float(target_point_in_body[0])
-            down_m = float(target_point_in_body[1])
-            fwd_m = float(target_point_in_body[2])
-
-            print(
-                f"Body offsets to target (m)  "
-                f"right={right_m:.3f}, down={down_m:.3f}, fwd={fwd_m:.3f}"
+            # Convert target point from tag frame to body frame and draw body-frame offset axes
+            target_point_in_body = tag_point_in_tag_to_body(
+                tvec_tag_in_body=tvec,
+                rvec_tag_in_body=rvec,
+                point_in_tag=target_point_in_tag,
             )
 
-            text = f"R:{right_m:.2f} D:{down_m:.2f} F:{fwd_m:.2f}"
-            cv2.putText(
-                frame,
-                text,
-                (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.8,
-                (0, 255, 255),
-                2,
-                cv2.LINE_AA,
+            target_ground_point_in_body = tag_point_in_tag_to_body(
+                tvec_tag_in_body=tvec,
+                rvec_tag_in_body=rvec,
+                point_in_tag=target_point_in_tag_on_ground,
             )
+
+            # print(f"Target point in body: left: {-target_point_in_body[0]:.2f}, down: {target_point_in_body[1]:.2f}, fwd: {target_point_in_body[2]:.2f}")
+
+
+
+            target_vertical_speed = -target_point_in_body[1] * 100
+            # yaw = math.atan2(target_point_in_body[0], target_point_in_body[2])
+            # INSERT_YOUR_CODE
+            # Compute yaw such that the vehicle is pointing toward the tag's position (in body frame).
+            # Here, yaw = atan2(left, forward) = atan2(x, z)
+            yaw = math.atan2(tvec_body[0], tvec_body[2]) / 3
+
+
+
+
+            mavlink.publish_landing_target(target_ground_point_in_body, use_angles=False, timestamp=frame_time_ms)
+
+            print(f"vertical speed: {target_vertical_speed:.2f}, yaw: {yaw:.2f}")
+
             mavlink.publish_position_target(target_point_in_body, yaw, target_vertical_speed, frame_time_ms)
-            # target_point = np.array([target_point_in_tag[1], target_point_in_tag[2] + LANDING_TARGET_MESSAGE_OFFSET, target_point_in_tag[0]])
-            ground_point_in_body = tag_point_to_body(tvec, rvec, target_point)
-            mavlink.publish_landing_target(ground_point_in_body, use_angles=False, timestamp=frame_time_ms)
 
-            axis_len = TAG_AXIS_LENGTH_M.get(int(det.tag_id), 0.05)
-            if float(tvec_cam[2, 0]) > 0.0:
-                cv2.drawFrameAxes(frame, cameraMatrix, distCoeffs, rvec_body, tvec_cam, axis_len,10)
+            # axis_len = TAG_AXIS_LENGTH_M.get(int(det.tag_id), 0.05)
+            # if float(tvec_cam[2, 0]) > 0.0:
+            #     cv2.drawFrameAxes(frame, cameraMatrix, distCoeffs, rvec_body, tvec_cam, axis_len,10)
         
 
 

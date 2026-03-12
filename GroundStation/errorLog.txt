@@ -1,0 +1,1 @@
+OpenCV(4.10.0) ./modules/imgproc/src/resize.cpp:4155: error: (-215:Assertion failed) inv_scale_x > 0 in function 'resize'

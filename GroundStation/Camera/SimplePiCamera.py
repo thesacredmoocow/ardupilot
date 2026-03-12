@@ -18,12 +18,12 @@ import os
 import json
 import numpy as np
 
-def setup_camera(size=(1536, 864), fps=120):
+def setup_camera(size=(1536, 864), fps=120, idx=0):
     SIZE = (1536, 864)
     FPS = 120
 
     print(f"Opening camera at {SIZE[0]}x{SIZE[1]}, {FPS} FPS...")
-    picam2 = Picamera2()
+    picam2 = Picamera2(idx)
     config = picam2.create_video_configuration(
         main={"size": SIZE},
         controls={"FrameRate": FPS},
@@ -31,6 +31,11 @@ def setup_camera(size=(1536, 864), fps=120):
     )
     picam2.configure(config)
     picam2.start()
+    # Enable continuous autofocus (if the camera supports it)
+    try:
+        picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous})
+    except Exception as e:
+        print(f"Autofocus not available (camera may not support it): {e}")
     return picam2
 
 def get_camera_params(json_path):

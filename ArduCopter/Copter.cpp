@@ -883,6 +883,9 @@ Copter::Copter(void)
     rc_throttle_control_in_filter(1.0f),
     inertial_nav(ahrs),
     param_loader(var_info)
+#if MODE_THROW_ENABLED
+    , last_throw_named_value_ms(0)
+#endif
 {
 }
 

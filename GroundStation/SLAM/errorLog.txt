@@ -1,0 +1,1 @@
+OpenCV(4.10.0) ./modules/core/src/persistence.cpp:718: error: (-5:Bad argument) Input file is invalid in function 'open'

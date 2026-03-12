@@ -1303,12 +1303,13 @@ void GCS_MAVLINK_Copter::handle_message_set_position_target_local_ned(const mavl
                     packet.coordinate_frame == MAV_FRAME_BODY_OFFSET_NED) {
                     pos_vector += copter.inertial_nav.get_position_neu_cm();
                 }
-                const float z_cm_neu = pos_vector.z;
+                // const float z_cm_neu = pos_vector.z;
                 float yaw_cd = ToDeg(packet.yaw) * 100.0f;
                 if (packet.coordinate_frame == MAV_FRAME_BODY_NED || packet.coordinate_frame == MAV_FRAME_BODY_OFFSET_NED) {
                     yaw_cd = wrap_360_cd(copter.ahrs.yaw_sensor + (int32_t)yaw_cd);
                 }
-                copter.mode_loiter.set_position_target_yaw_z_from_mavlink(yaw_cd, z_cm_neu);
+                copter.mode_loiter.set_position_target_yaw_z_from_mavlink(yaw_cd, packet.z);
+                // GCS_MAVLINK::send_text(MAV_SEVERITY_INFO, "set_position_target_yaw_z_from_mavlink: %f", packet.z);
             }
             return;
         }
@@ -1538,10 +1539,20 @@ void GCS_MAVLINK_Copter::handle_message(const mavlink_message_t &msg)
         copter.terrain.handle_data(chan, msg);
         break;
 #endif
+#if MODE_THROW_ENABLED || TOY_MODE_ENABLED
+    case MAVLINK_MSG_ID_NAMED_VALUE_INT: {
+#if MODE_THROW_ENABLED
+        mavlink_named_value_int_t nvi;
+        mavlink_msg_named_value_int_decode(&msg, &nvi);
+        if (strncmp(nvi.name, "THROW", 10) == 0) {
+            copter.last_throw_named_value_ms = AP_HAL::millis();
+        }
+#endif
 #if TOY_MODE_ENABLED
-    case MAVLINK_MSG_ID_NAMED_VALUE_INT:
         copter.g2.toy_mode.handle_message(msg);
+#endif
         break;
+    }
 #endif
     default:
         GCS_MAVLINK::handle_message(msg);
